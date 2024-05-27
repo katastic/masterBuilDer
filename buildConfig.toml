@@ -4,6 +4,9 @@
     compilers = ["dmd", "ldc"]
     targets = ["linux", "windows"]
     
+[options]
+    automaticallyAddOutputExtension = true   # main for linux, main.exe for windows
+
 [windows]
     sourcePaths = [ './src/', './toml/src/toml' ]
     recursiveSourcePaths = [ ]
@@ -36,7 +39,7 @@
     debug = ["-debug","-d-debug"]
     debugSymbols = ["-g", "-g"]
     debugSymbolsNonDDebuggers = ["", "-gc"]
-    optimize = ["-o", "-o"]
+    optimize = ["-O", "-O"]
     profile = ["-profile",""]
     release = ["-release", "--release"]
     profileGC = ["-profile=gc",""]
@@ -50,12 +53,14 @@
 
 [release]
     name = "release"
-    modesEnabled = ["optimize", "other"]
+    modesEnabled = ["optimize", "other", "ignoreDepreciated"]
     extraCompilerFlags = "" # these won't be cross compiler
     extraLinkerFlags = ""
+    outputFilename = "main" # auto adds .exe for windows
 
 [debug]
     name = "debug"
-    modesEnabled = ["debug", "optimize", "other"]
+    modesEnabled = ["debug", "optimize", "ignoreDepreciated"]
     extraCompilerFlags = ""
     extraLinkerFlags = ""
+    outputFilename = "main" # auto adds .exe for windows

@@ -12,13 +12,16 @@
 		- for fun: FUZZY FIXER. Use genetic algorithm to try to match nearest wrong/mispelled string to correct one.
 
 	todo:
+		- figure out dmd binary file compilation import issue.
+		- filesList is a bunch of FILES. We need to trim each `.d` and replace it with `.obj`. 
+			- Might be as simple as string replace. But what if some moron has .d _inside_ their filename?
 		- what if file is REMOVED?
 		- do RECURSIVE file path scans work? And also manual lib names (instead of paths)
 		- dump individual compiled files into a temp directory (specified WHERE?)
 		- alternate cachefile name
 		- why do we SCAN FILES on alternative OS/configurations??? It's just going to exception out.
 
-		- do we store cached files PER PROFILE??? Because if we change profile the file caches aren't updated. 
+	- do we store cached files PER PROFILE??? Because if 5we change profile the file caches aren't updated. 
 			- Maybe store each profile in its own section.
 +/
 module app;
@@ -51,13 +54,7 @@ final class fileCacheList{
 			}
 		}
 		
-	string[] getDifferences(){
-		string[] temp;
-		foreach(v,k; differencesDb){
-			temp ~= v; // just the filenames. probably a one liner to do this.
-			}
-		return temp;
-		}
+	string[] getDifferences() => differencesDb.keys;
 
 	fileHashes compareAndFindDifferences(){
 		fileHashes oldValues 	 = scanCachedHashes();
@@ -463,7 +460,7 @@ void commandBuild(){
 			default:		 assert(0, format("invalid target name [%s]", exeConfig.selectedProfile)); break;
 			}
 		}
-	writefln("\"%s\"\n", libPathList);
+	writefln("\t\"%s\"", libPathList);
 
 	writeln("");
 	writefln("Buildname: %s (%s/%s)",	exeConfig.selectedProfile,
@@ -492,7 +489,7 @@ void commandBuild(){
 			}
 		}else{
 		writeln("Would have tried to execute the following string:");
-		writeln(runString);
+		writeln("\t",runString);
 		}
 	}else{
 		bool stopOnFirstError = true; /// do we stop on the first errored compile, or attempt all? exeConfig option?
@@ -510,19 +507,20 @@ void commandBuild(){
 					writefln("Compilation of %s succeeded.\n", file);
 					}
 				}else{
-				writeln("would have tried to execute:\n", execString);
+				writeln("Would have tried to execute (file to obj):\n\t", execString);
 				}
 			}
 		if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
 		// then if they all succeed, compile the final product.
+		import std.string : replace;
 		runString = "dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ 
-		  	" " ~ flags ~ " " ~	filesList ~ " " ~ libPathList ~ " " ~ 
+		  	" " ~ flags ~ " " ~	filesList.replace(".d",".obj") ~ " " ~ libPathList ~ " " ~ 
 			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags;
 
-		if(exeConfig.doRunCompiler){
-			writeln("Would have tried to execute:", runString);
+		if(!exeConfig.doRunCompiler){
+			writeln("Would have tried to execute (executable):\n\t", runString);
 			}else{
-			writeln("Trying to execute:\n", runString);
+			writeln("Trying to execute:\n\t", runString);
 			auto dmd = executeShell(runString);				
 			if(dmd.status != 0){
 				writefln("Compilation failed:\n%s", dmd.output);

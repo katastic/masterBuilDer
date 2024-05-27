@@ -14,7 +14,8 @@
         '.',
         'C:\git\dlawn\winbuilddeps\lib\', 
         'C:\git\dlawn\winbuilddeps\dallegro5', 
-        'C:\git\dlawn\toml'] # auto adds -L-L?
+        'C:\git\dlawn\toml',
+        'C:\git\dlawn\src'] 
     recursiveLibPaths = []
     libs = [ "toml" ]
 
@@ -25,7 +26,8 @@
         '.',
         'C:\git\dlawn\winbuilddeps\lib\', 
         'C:\git\dlawn\winbuilddeps\dallegro5', 
-        'C:\git\dlawn\toml'] # auto adds -L-L?
+        'C:\git\dlawn\toml',
+        'C:\git\dlawn\src'] 
     recursiveLibPaths = []
     libs = [ "toml" ]
 
@@ -49,18 +51,25 @@
     inline = ["-inline", ""]
     stackStomp = ["-gx -s -gf", ""] # -gf emit debug info for all referenced types, -gs always emit stack frames, -gx stack stomp code
     other = ["", ""]
-    ignoreDepreciated = ["-d", "-d"]
+    ignoreDepreciated = ["-d", "-d"] # silently allow
+    warnDepreciated = ["-dw", ""]
+    errorDepreciated = ["-de", ""]
+    noObjectIntermediates = ["-o-", ""] 
 
 [release]
     name = "release"
-    modesEnabled = ["optimize", "other", "ignoreDepreciated"]
-    extraCompilerFlags = "" # these won't be cross compiler
+    modesEnabled = ["optimize", "other", "ignoreDepreciated", "noObjectIntermediates"]
+    extraCompilerFlags = "" # these won't be cross compiler. add your own [modeStrings] for those.
     extraLinkerFlags = ""
-    outputFilename = "main" # auto adds .exe for windows
+    outputFilename = "main" # auto add .exe for windows or change [automaticallyAddOutputExtension]
+    successOnRunScript = ""
+    failureOnRunScript = ""
 
 [debug]
     name = "debug"
-    modesEnabled = ["debug", "optimize", "ignoreDepreciated"]
-    extraCompilerFlags = ""
+    modesEnabled = ["debug", "optimize", "ignoreDepreciated", "noObjectIntermediates"]
+    extraCompilerFlags = "" # these won't be cross compiler. add your own [modeStrings] for those.
     extraLinkerFlags = ""
-    outputFilename = "main" # auto adds .exe for windows
+    outputFilename = "main" # auto add .exe for windows or change [automaticallyAddOutputExtension]
+    successOnRunScript = ""
+    failureOnRunScript = ""

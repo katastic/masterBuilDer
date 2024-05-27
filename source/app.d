@@ -1,3 +1,26 @@
+/+ 	
+	masterBuilDer
+
+	tools we could add:
+		- fuzzy importer. Tries to remove each import and see if it still compiles. 
+		- create [init] buildscript. Dumps the default values into a TOML file!
+		- scan for (remove?) too many repeating newlines (dLawn scripts)
+		- [line] counts? pretty simple. Could support random scripts after succeeding builds though.
+		- list any FIXME, TODO, etc in source files. also LAST if you want to mark where you worked last at end off day.
+		- [unit] tests
+		- support ASCII colorizing? re-implement python pygments without having to invoke it or dep on it?
+		- for fun: FUZZY FIXER. Use genetic algorithm to try to match nearest wrong/mispelled string to correct one.
+
+	todo:
+		- what if file is REMOVED?
+		- do RECURSIVE file path scans work? And also manual lib names (instead of paths)
+		- dump individual compiled files into a temp directory (specified WHERE?)
+		- alternate cachefile name
+		- why do we SCAN FILES on alternative OS/configurations??? It's just going to exception out.
+
+		- do we store cached files PER PROFILE??? Because if we change profile the file caches aren't updated. 
+			- Maybe store each profile in its own section.
++/
 module app;
 import std.process, std.path, std.stdio;
 import std.digest.crc, std.format, std.file;
@@ -13,31 +36,34 @@ void conditionalCompile(fileHashes filesList){ // used????
 	}
 
 final class fileCacheList{
-	import toml, std.file, std.digest, std.digest.crc;
 	string dir;
 	fileHashes database;
 	fileHashes differencesDb;
-	bool foundDifferences=false;
+	bool foundDifferences = false;
 	string[] tempFiles;
-
-	void initialFileScan(){ /// if we don't have an existing file list.
-		database = scanHashes(tempFiles);
-		}
 
 	this(string[] filenames){
 		tempFiles = filenames;
 		differencesDb = compareAndFindDifferences();
 		if(differencesDb.length > 0){
-			// found differences
 			writeln("Found differences:", differencesDb);
 			foundDifferences = true;
 			}
 		}
+		
+	string[] getDifferences(){
+		string[] temp;
+		foreach(v,k; differencesDb){
+			temp ~= v; // just the filenames. probably a one liner to do this.
+			}
+		return temp;
+		}
 
 	fileHashes compareAndFindDifferences(){
-		fileHashes oldValues 	 = scanCachedHashes(tempFiles);
-		if(oldValues.length == 0){writeln("No cached data. Enumerating all files."); return oldValues;}
+		fileHashes oldValues 	 = scanCachedHashes();
 		fileHashes currentValues = scanHashes(tempFiles);
+		if(oldValues.length == 0){ verboseWriteln("No cached data. Enumerating all files."); return currentValues;}
+		database = currentValues; // NOTE: SIDE-EFFECT. Calling this updates our perception of database.
 		fileHashes differences;
 
 		foreach(k,v; oldValues){    writefln("old    %s %s", k, v);}
@@ -68,11 +94,15 @@ final class fileCacheList{
 		return differences;
 		}
 	
+	void saveResults(){
+		writeNewCachedList(database);
+		}
+
 	void writeNewCachedList(fileHashes db){	
-		auto file = File("buildFileCache.toml", "w");
+		auto file = File(exeConfig.cacheFileName, "w");
 		file.writeln("[fileHashes]");
 
-		writeln("OUTPUT TO FILE--> buildFileCache.toml");
+		writeln("OUTPUT TO FILE--> ", exeConfig.cacheFileName);
 		foreach(f, hex; db){
 			//string hex = toHexString!(LetterCase.lower)(digest!CRC32(readText(f))).dup;
 			writefln("\t%30s - %s", f, hex);
@@ -82,17 +112,17 @@ final class fileCacheList{
 		}
 
 	// TODO: specify alternate build file support in exeConfig or something.
-	fileHashes scanCachedHashes(string[] filenames){
+	fileHashes scanCachedHashes(){
 		fileHashes results;
 		try{
 		TOMLDocument doc = parseTOML(cast(string)read(exeConfig.cacheFileName));
-		writeln("scanCachedHashes() - buildFileCache.toml");
+		writeln("scanCachedHashes() - ", exeConfig.cacheFileName);
 		foreach(f, hex; doc["fileHashes"]){
 			writefln("\t%30s - %s", f, hex.str);
 			results[f] = hex.str;
 			}
 		}catch(Exception e){
-			writeln("No buildFileCache.toml file found, or inaccessable."); 
+			writefln("No %s file found, or inaccessable.", exeConfig.cacheFileName); 
 		}
 		return results;
 		}
@@ -110,7 +140,7 @@ final class fileCacheList{
 	}
 
 struct modeStringConfig{
-	string[] modePerCompiler;
+	string[string] modePerCompiler;
 	}
 
 struct globalConfiguration{
@@ -141,17 +171,13 @@ struct profileConfiguration{
 	}
 
 profileConfiguration[string] runToml(){
-	import std.experimental.logger;
 	import toml;
-	import std.ascii : newline;
-	import std.exception : enforce, assertThrown;
-	import std.math : isNaN, isFinite, isClose;
 	import std.conv : to;
 	import std.file : read;
 	TOMLDocument doc;
 
-	writeln(readText("buildConfig.toml"));
-	doc = parseTOML(cast(string)read("buildConfig.toml"));
+	writeln(readText(exeConfig.buildScriptFileName));
+	doc = parseTOML(cast(string)read(exeConfig.buildScriptFileName));
 	
 	auto compilers = doc["project"]["compilers"].array;
 	foreach(c; compilers){
@@ -169,7 +195,7 @@ profileConfiguration[string] runToml(){
 			{
 				try{
 				
-					foreach(string __path; dirEntries(FIXME ~ %s, \"*.d\", SpanMode.shallow)){   
+					foreach(string __path; dirEntries(FIXME ~ %s, \"*.d\", SpanMode.shallow.shallow)){   
 					filesList ~= __path;
 					}
 				}catch(Exception e){
@@ -181,19 +207,20 @@ profileConfiguration[string] runToml(){
 
 	globalConfig.automaticallyAddOutputExtension = doc["options"]["automaticallyAddOutputExtension"].boolean;
 
-	foreach(m, n; doc["modeStrings"]){
-		writeln("[",m, "] = ", n[0], "/", n[1], " of type ", n.type); // string
-		modeStringConfig _modeString;
-		foreach(t; n.array){_modeString.modePerCompiler ~= t.str;}
-		globalConfig.modeStrings[m] = _modeString;
-		}
-	writeln(globalConfig);	
-
 	string[] convTOMLtoArray(TOMLValue t){ 
 		import std.algorithm : map;
 		import std.array : array;
 		return t.array.map!((o) => o.str).array;
 		}
+
+	string[] compilerNames = convTOMLtoArray(doc["project"]["compilers"]);
+	foreach(m, n; doc["modeStrings"]){
+		writeln("[",m, "] = ", n[0], "/", n[1], " of type ", n.type); // string
+		modeStringConfig _modeString;
+		foreach(i, t; n.array){_modeString.modePerCompiler[compilerNames[i]] ~= t.str;}
+		globalConfig.modeStrings[m] = _modeString;
+		}
+	writeln(globalConfig);	
 
 	foreach(t; targets){
 		targetConfiguration tc;
@@ -223,19 +250,20 @@ profileConfiguration[string] runToml(){
 		writeln("Source files found: ", tc.sourceFilesFound);
 		}
 	profileConfiguration[string] pConfigs;
-	int chosenCompiler = 0; // FIXME
 	foreach(mode; doc["project"]["profiles"].array){
 		string name = mode.str;
-		writeln("Reading profile: ", name); // "debug", "release"
+		writeln("Reading profile: ", name); // "debug", "release", etc
 		
 		auto buildProfileData = doc[mode.str];
 		writeln("\t", buildProfileData);
 		profileConfiguration pc;
 		auto modeArray = buildProfileData["modesEnabled"].array; // selected modes for configuration
 		string temp;
-		foreach(m; modeArray){
+		string currentCompiler = "dmd"; // TODO FIXME.  compilerNames[i]?
+		foreach(i, m; modeArray){
+			writeln(i, m);
 			writeln("\tfound mode ", m.str);
-			temp ~= globalConfig.modeStrings[m.str].modePerCompiler[chosenCompiler] ~ " ";
+			temp ~= globalConfig.modeStrings[m.str].modePerCompiler[currentCompiler] ~ " ";
 			}
 		pc.mode = temp;
 		writefln("\tfull mode string [%s]", temp);		
@@ -253,6 +281,7 @@ void verboseWriteln(A...)(A a){  // todo: what about fln version. Pass in a std.
 	}
 
 struct exeConfigType{
+	bool doCachedCompile = true;
 	bool doRunCompiler = false;
 	bool didCompileSucceed = false;
 	bool doPrintVerbose = true; /// for error troubleshooting
@@ -262,7 +291,8 @@ struct exeConfigType{
 	string selectedCompiler = "dmd";
 	string selectedTargetOS = "";  // set by version statement in main.
 
-	string cacheFileName = "buildFileCache.toml";
+	string buildScriptFileName = "buildConfig.toml"; /// Unless overriden with option TODO
+	string cacheFileName = "buildFileCache.toml"; // should this be in the buildConfig?
 	string extraCompilerFlags = "";
 	string extraLinkerFlags = "";
 	}
@@ -271,6 +301,7 @@ void displayHelp(){
 	writeln("");
 	writeln("  masterBuilder[.exe] [command] [option=value] [option=value] -- args");
 	writeln("");
+	writeln("\tinit  - create a default build config. TODO.");
 	writeln("\trun   - run the program");
 	writeln("\tbuild - actually build");
 	writeln("\tclean - clean up temporary files");
@@ -321,14 +352,14 @@ int parseModeInit(string arg){
 bool isAny(string t, string v){ import std.string : indexOfAny; return (t.indexOfAny(v) != -1); } /// Is any string V in T? return: boolean
 
 int parseModeBuild(string arg){
-	import std.string;
+	import std.string : indexOfAny, toLower;
 
 	writefln("parseModeBuild(%s)", arg);	
-	long n = arg.indexOfAny("=");
+	immutable long n = arg.indexOfAny("=");
 	if(n == -1){writeln("Missing equals?"); terminateEarlyString(arg); return -1;} // args must be in key=value, so if there's no equal it's invalid.
 	writefln("matching [%s] = [%s]", arg[0..n], arg[n+1..$]);
-	string option=arg[0..n];
-	string value=arg[n+1..$];
+	immutable string option=arg[0..n];
+	immutable string value=arg[n+1..$];
 	// note we ONLY change case of option! We don't want to
 	//  accidentally change case of a compiler flag string!
 	switch(option.toLower){
@@ -403,7 +434,6 @@ void commandBuild(){
 	profileConfiguration[string]  pConfigs = runToml();
 	writeln(pConfigs);
     string filesList = "";
-    int i = 0;
 
 	writeln("");
 	displayQuote();
@@ -412,13 +442,17 @@ void commandBuild(){
 	foreach(t; tConfigs){
 		writeln(t.sourceFilesFound);
 	}
-    filesList = "";
 	foreach(file; tConfigs[exeConfig.selectedTargetOS].sourceFilesFound){
 		filesList ~= file ~ " ";
 		}
 	writefln("\"%s\"\n", filesList);
 
-	auto fc = new fileCacheList(tConfigs[exeConfig.selectedTargetOS].sourceFilesFound);
+	auto fcl = new fileCacheList(tConfigs[exeConfig.selectedTargetOS].sourceFilesFound);
+	string[] changedFiles = fcl.getDifferences();
+	writeln("Changed files detected:");
+	foreach(f; changedFiles){
+		writeln("\t", f);
+		}
 
     writeln("Library paths:");
 	string libPathList = "";
@@ -432,20 +466,20 @@ void commandBuild(){
 	writefln("\"%s\"\n", libPathList);
 
 	writeln("");
-	writefln("Buildname: %s (%s/%s)", 
-		exeConfig.selectedProfile,
-		exeConfig.selectedTargetOS, 
-		exeConfig.selectedCompiler);
+	writefln("Buildname: %s (%s/%s)",	exeConfig.selectedProfile,
+			exeConfig.selectedTargetOS, exeConfig.selectedCompiler);
 	writeln("");
 
-    string flags = pConfigs[exeConfig.selectedProfile].mode;
-
-	string runString =  "dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ " " ~ flags ~ " " ~
-			filesList ~ " " ~ libPathList ~ " " ~ 
-			exeConfig.extraCompilerFlags ~ " " ~ 
-			exeConfig.extraLinkerFlags;
-
-	if(exeConfig.doRunCompiler){
+    immutable string flags = pConfigs[exeConfig.selectedProfile].mode;
+	string runString;
+	bool doCachedCompile=true;
+	if(!doCachedCompile){
+		runString =
+			"dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ 
+		  	" " ~ flags ~ " " ~	filesList ~ " " ~ libPathList ~ " " ~ 
+			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags;
+		
+		if(exeConfig.doRunCompiler){
 		auto dmd = executeShell(runString);
 		if (dmd.status != 0){
 			writeln("Compilation failed:\n", dmd.output);
@@ -454,17 +488,56 @@ void commandBuild(){
 			writeln("Compilation succeeded:\n\n", dmd.output);
 			writeln();
 			exeConfig.didCompileSucceed = true;
+			fcl.saveResults();
 			}
 		}else{
 		writeln("Would have tried to execute the following string:");
 		writeln(runString);
 		}
+	}else{
+		bool stopOnFirstError = true; /// do we stop on the first errored compile, or attempt all? exeConfig option?
+		bool hasErrorOccurred = false; 
+		foreach(file; changedFiles){
+			string execString = format("dmd -c -od=/temp/ %s %s", file, libPathList);
+			
+			if(exeConfig.doRunCompiler){
+				writeln("trying to execute:\n", execString);
+				auto exec = executeShell(execString);				
+				if(exec.status != 0){
+					writefln("Compilation of %s failed:\n%s", file, exec.output);
+					if(stopOnFirstError)break;
+					}else{
+					writefln("Compilation of %s succeeded.\n", file);
+					}
+				}else{
+				writeln("would have tried to execute:\n", execString);
+				}
+			}
+		if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
+		// then if they all succeed, compile the final product.
+		runString = "dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ 
+		  	" " ~ flags ~ " " ~	filesList ~ " " ~ libPathList ~ " " ~ 
+			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags;
+
+		if(exeConfig.doRunCompiler){
+			writeln("Would have tried to execute:", runString);
+			}else{
+			writeln("Trying to execute:\n", runString);
+			auto dmd = executeShell(runString);				
+			if(dmd.status != 0){
+				writefln("Compilation failed:\n%s", dmd.output);
+				}else{
+				writefln("Compilation succeeded.\n");
+				}
+			}
+	}
+
+	
 	}
 
 globalConfiguration globalConfig;
 targetConfiguration[string] tConfigs;
 exeConfigType exeConfig;
-//string lastBuildFileName = "lastBuildFiles.toml";
 
 void setupDefaultOSstring(){
 	exeConfig.selectedTargetOS = "excuse me, wat"; // default fail case.

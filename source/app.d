@@ -1,39 +1,49 @@
-/++ 
- * Questions
-	- is DUB docs really so shit it doesn't even display how to run a program and pass an argument in the --help?
-	dub run -- [commandline args] works though.
- +/
 module app;
 import std.process, std.path, std.stdio;
 import std.digest.crc, std.format, std.file;
 import toml;
 
-//struct fileHash { string name, hash; }
-
 alias fileHashes = string[string];
 
+void conditionalCompile(fileHashes filesList){ // used????
+	writeln("conditionalCompile()");
+	foreach(k,v; filesList){
+		writeln(k);
+		}
+	}
+
 final class fileCacheList{
+	import toml, std.file, std.digest, std.digest.crc;
 	string dir;
 	fileHashes database;
+	fileHashes differencesDb;
+	bool foundDifferences=false;
 	string[] tempFiles;
 
-	this(string[] filenames){
-		import toml, std.file, std.digest, std.digest.crc;
-		//scanCachedHashes(filenames);
-		tempFiles = filenames;
-		compareAndFindDifferences();
+	void initialFileScan(){ /// if we don't have an existing file list.
+		database = scanHashes(tempFiles);
 		}
 
-	void compareAndFindDifferences(){
+	this(string[] filenames){
+		tempFiles = filenames;
+		differencesDb = compareAndFindDifferences();
+		if(differencesDb.length > 0){
+			// found differences
+			writeln("Found differences:", differencesDb);
+			foundDifferences = true;
+			}
+		}
+
+	fileHashes compareAndFindDifferences(){
 		fileHashes oldValues 	 = scanCachedHashes(tempFiles);
+		if(oldValues.length == 0){writeln("No cached data. Enumerating all files."); return oldValues;}
 		fileHashes currentValues = scanHashes(tempFiles);
 		fileHashes differences;
 
+		foreach(k,v; oldValues){    writefln("old    %s %s", k, v);}
+		foreach(k,v; currentValues){writefln("cached %s %s", k, v);}
+
 		// what if a file is REMOVED??
-
-		foreach(k,v; oldValues){writefln("%s %s", k, v);}
-		foreach(k,v; currentValues){writefln("%s %s", k, v);}
-
 		writeln("compareAndFindDifferences() - DIFFERENCES");
 		foreach(k, v; currentValues){
 			if(k !in oldValues){
@@ -42,7 +52,7 @@ final class fileCacheList{
 				continue;
 				}
 			if(currentValues[k] != oldValues[k]){				
-				writefln("\t%30s - %s vs %s", k, v, currentValues[k]);
+				writefln("\t%30s - %s vs %s [DIFF]", k, v, oldValues[k]);
 				differences[k] = v;
 				} else {
 				writefln("\t%30s - %s vs %s [MATCH]", k, v, currentValues[k]);
@@ -55,9 +65,10 @@ final class fileCacheList{
 
 		// we also want to rebuild EACH FILE to a temp object at some point.
 		// and also support CLEAN for cleaning them up
+		return differences;
 		}
 	
-	void writeNewCachedList(fileHashes db){
+	void writeNewCachedList(fileHashes db){	
 		auto file = File("buildFileCache.toml", "w");
 		file.writeln("[fileHashes]");
 
@@ -70,15 +81,19 @@ final class fileCacheList{
 			}
 		}
 
+	// TODO: specify alternate build file support in exeConfig or something.
 	fileHashes scanCachedHashes(string[] filenames){
-		// TODO deal with case if there's no initial file.
-		TOMLDocument doc = parseTOML(cast(string)read("buildFileCache.toml"));
 		fileHashes results;
+		try{
+		TOMLDocument doc = parseTOML(cast(string)read(exeConfig.cacheFileName));
 		writeln("scanCachedHashes() - buildFileCache.toml");
 		foreach(f, hex; doc["fileHashes"]){
 			writefln("\t%30s - %s", f, hex.str);
 			results[f] = hex.str;
 			}
+		}catch(Exception e){
+			writeln("No buildFileCache.toml file found, or inaccessable."); 
+		}
 		return results;
 		}
 
@@ -148,7 +163,7 @@ profileConfiguration[string] runToml(){
 		writeln("targets found: ", t);
 		}
 
-	template wrapInException(string path){
+	template wrapInException(string path){ //fixme bad name. Also. Not used anymore???
 		import std.format;		
     	const char[] wrapInException = format("
 			{
@@ -167,11 +182,7 @@ profileConfiguration[string] runToml(){
 	globalConfig.automaticallyAddOutputExtension = doc["options"]["automaticallyAddOutputExtension"].boolean;
 
 	foreach(m, n; doc["modeStrings"]){
-		//pragma(msg, typeof(m));
-		//pragma(msg, typeof(n));
-		//writeln("1 ", m.type); // string
 		writeln("[",m, "] = ", n[0], "/", n[1], " of type ", n.type); // string
-		string tempString;
 		modeStringConfig _modeString;
 		foreach(t; n.array){_modeString.modePerCompiler ~= t.str;}
 		globalConfig.modeStrings[m] = _modeString;
@@ -181,33 +192,29 @@ profileConfiguration[string] runToml(){
 	string[] convTOMLtoArray(TOMLValue t){ 
 		import std.algorithm : map;
 		import std.array : array;
-//		string[] strings; foreach(value; t.array){strings ~= value.str;} // works
 		return t.array.map!((o) => o.str).array;
 		}
 
 	foreach(t; targets){
 		targetConfiguration tc;
-		writeln("doc", t.str);
+		verboseWriteln("doc", t.str);
 		auto d = doc[t.str];
 		tc.target = t.str;
-		writeln("TEST");
+
 	//	foreach(value; d["sourcePaths"].array){cc.sourcePaths ~= value.str;}
 		tc.sourcePaths 			= convTOMLtoArray(d["sourcePaths"]);
 		tc.recursiveSourcePaths = convTOMLtoArray(d["recursiveSourcePaths"]);
 		tc.libPaths 			= convTOMLtoArray(d["libPaths"]); 
 		tc.recursiveLibPaths 	= convTOMLtoArray(d["recursiveLibPaths"]);
 		tc.libs 				= convTOMLtoArray(d["libs"]);
-		writeln("TEST2");
-		string FIXME = r""; /// working directory fix
-		string filesList;
+
 		foreach(path; tc.sourcePaths){
 				writefln("try scanning path %s for target %s", path, tc.target);
 				try{				
 					foreach(string __path; dirEntries(path, "*.d", SpanMode.shallow)){   
 						writeln("\t", __path);
-					//filesList ~= __path ~ " ";
-					tc.sourceFilesFound ~= __path; // IS THIS FIXED? TODO BUG
-					}
+						tc.sourceFilesFound ~= __path;
+						}
 				}catch(Exception e){
 					writeln("Exception occured: ", e);
 				}
@@ -238,14 +245,24 @@ profileConfiguration[string] runToml(){
 	return pConfigs;
 	}
 
+void verboseWriteln(A...)(A a){  // todo: what about fln version. Pass in a std.format is all needed?
+	if(exeConfig.doPrintVerbose){
+		foreach(t; a)
+			writeln(t);
+		}
+	}
+
 struct exeConfigType{
 	bool doRunCompiler = false;
-	string modeSet="default"; // todo: change to enum or whatever
+	bool didCompileSucceed = false;
+	bool doPrintVerbose = true; /// for error troubleshooting
+	string modeSet="default"; // todo: change to enum or whatever. /// This is the builder mode state variable! NOT a "mode"/profile/etc. 'default' to start.
 	
 	string selectedProfile = "release";
 	string selectedCompiler = "dmd";
 	string selectedTargetOS = "";  // set by version statement in main.
 
+	string cacheFileName = "buildFileCache.toml";
 	string extraCompilerFlags = "";
 	string extraLinkerFlags = "";
 	}
@@ -301,7 +318,7 @@ int parseModeInit(string arg){
 	return -1;
 	}
 
-bool isAny(string t, string v){ import std.string : indexOfAny; return (t.indexOfAny(v) != -1); }
+bool isAny(string t, string v){ import std.string : indexOfAny; return (t.indexOfAny(v) != -1); } /// Is any string V in T? return: boolean
 
 int parseModeBuild(string arg){
 	import std.string;
@@ -419,8 +436,8 @@ void commandBuild(){
 		exeConfig.selectedProfile,
 		exeConfig.selectedTargetOS, 
 		exeConfig.selectedCompiler);
-writeln("");
- 
+	writeln("");
+
     string flags = pConfigs[exeConfig.selectedProfile].mode;
 
 	string runString =  "dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ " " ~ flags ~ " " ~
@@ -431,11 +448,12 @@ writeln("");
 	if(exeConfig.doRunCompiler){
 		auto dmd = executeShell(runString);
 		if (dmd.status != 0){
-			writeln("Compilation failed:\n", dmd.output);        
+			writeln("Compilation failed:\n", dmd.output);
 			}else{
 			writefln("Writing to [%s]", pConfigs[exeConfig.selectedProfile].outputFilename);
 			writeln("Compilation succeeded:\n\n", dmd.output);
 			writeln();
+			exeConfig.didCompileSucceed = true;
 			}
 		}else{
 		writeln("Would have tried to execute the following string:");
@@ -446,14 +464,17 @@ writeln("");
 globalConfiguration globalConfig;
 targetConfiguration[string] tConfigs;
 exeConfigType exeConfig;
-string lastBuildFileName = "lastBuildFiles.toml";
+//string lastBuildFileName = "lastBuildFiles.toml";
+
+void setupDefaultOSstring(){
+	exeConfig.selectedTargetOS = "excuse me, wat"; // default fail case.
+	version(Windows)exeConfig.selectedTargetOS = "windows";
+	version(Linux)exeConfig.selectedTargetOS   = "linux";
+	version(MacOSX)exeConfig.selectedTargetOS  = "macos";
+	}
 
 int main(string[] args){
-	version(Windows){
-		exeConfig.selectedTargetOS = "windows"; // default to whatever OS it is
-	}else{
-		exeConfig.selectedTargetOS = "linux"; // default to whatever OS it is
-	}
+	setupDefaultOSstring();
 	writeln(args);
 	if(args.length > 1){
 		parseCommandline(args[1..$]);

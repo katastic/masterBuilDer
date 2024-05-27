@@ -1,0 +1,12 @@
+{
+	"authors": [
+		"benwick"
+	],
+	"copyright": "Copyright © 2024, benwick",
+	"dependencies": {
+		"toml": "~>2.0.1"
+	},
+	"description": "A minimal D application.",
+	"license": "MIT",
+	"name": "masterbuilder"
+}

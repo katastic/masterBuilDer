@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/masterbuilder
+masterbuilder.so
+masterbuilder.dylib
+masterbuilder.dll
+masterbuilder.a
+masterbuilder.lib
+masterbuilder-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

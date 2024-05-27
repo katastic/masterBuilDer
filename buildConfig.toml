@@ -1,0 +1,61 @@
+[project]
+    name = "dLawn"
+    profiles = ["release", "debug"]
+    compilers = ["dmd", "ldc"]
+    targets = ["linux", "windows"]
+    
+[windows]
+    sourcePaths = [ './src/', './toml/src/toml' ]
+    recursiveSourcePaths = [ ]
+    libPaths = [
+        '.',
+        'C:\git\dlawn\winbuilddeps\lib\', 
+        'C:\git\dlawn\winbuilddeps\dallegro5', 
+        'C:\git\dlawn\toml'] # auto adds -L-L?
+    recursiveLibPaths = []
+    libs = [ "toml" ]
+
+[linux]
+    sourcePaths = [ './src/', './toml/src/toml' ]
+    recursiveSourcePaths = [ ]
+    libPaths = [
+        '.',
+        'C:\git\dlawn\winbuilddeps\lib\', 
+        'C:\git\dlawn\winbuilddeps\dallegro5', 
+        'C:\git\dlawn\toml'] # auto adds -L-L?
+    recursiveLibPaths = []
+    libs = [ "toml" ]
+
+[setupCode]
+    getDeps = ["git submodule init", "git submodule init"]
+
+#dmd -debug -gs -gf -g -gx -ofmain `ls ./src/*.d` `ls ./toml/src/toml/*.d` -L-L./lib/ 
+#ldc2 -wi -d-debug -fsanitize=address -fsanitize-memory-track-origins=0 -fsanitize-blacklist=asanblacklist.txt --frame-pointer=all  -g --gc -stats -ofmain `ls ./src/*.d`  `ls ./toml/src/toml/*.d` -L-L/usr/local/lib/ -L-L./lib/ $@ --preview=shortenedMethods
+
+[modeStrings]
+    debug = ["-debug","-d-debug"]
+    debugSymbols = ["-g", "-g"]
+    debugSymbolsNonDDebuggers = ["", "-gc"]
+    optimize = ["-o", "-o"]
+    profile = ["-profile",""]
+    release = ["-release", "--release"]
+    profileGC = ["-profile=gc",""]
+    haltingWarn = ["-w", "-w"]
+    warn = ["-wi", "-wi"]
+    setOutputFile = ["-of=", "--of="]
+    inline = ["-inline", ""]
+    stackStomp = ["-gx -s -gf", ""] # -gf emit debug info for all referenced types, -gs always emit stack frames, -gx stack stomp code
+    other = ["", ""]
+    ignoreDepreciated = ["-d", "-d"]
+
+[release]
+    name = "release"
+    modesEnabled = ["optimize", "other"]
+    extraCompilerFlags = "" # these won't be cross compiler
+    extraLinkerFlags = ""
+
+[debug]
+    name = "debug"
+    modesEnabled = ["debug", "optimize", "other"]
+    extraCompilerFlags = ""
+    extraLinkerFlags = ""

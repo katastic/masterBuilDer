@@ -1,5 +1,6 @@
 /+ 	
-	masterBuilDer
+	masterBuilDer		
+		- mb for short?
 
 	tools we could add:
 		- fuzzy importer. Tries to remove each import and see if it still compiles. 
@@ -11,8 +12,17 @@
 		- support ASCII colorizing? re-implement python pygments without having to invoke it or dep on it?
 		- for fun: FUZZY FIXER. Use genetic algorithm to try to match nearest wrong/mispelled string to correct one.
 
+		- could support override= for overriding any build config. So you can specify a different
+		 output target name or build line for testing stuff quickly. But lets be honest, editinng 
+		 the config will be just as fast.
+
+		 - help options
+		 	- enumerate all the custom option flags that can be set. exeConfig, profileConfig, etc.
+
 	todo:
 		- figure out dmd binary file compilation import issue.
+			- specify -I/src/ for folders that get imported. May have to include all source 
+				and recursiveSource folders
 		- filesList is a bunch of FILES. We need to trim each `.d` and replace it with `.obj`. 
 			- Might be as simple as string replace. But what if some moron has .d _inside_ their filename?
 		- what if file is REMOVED?
@@ -31,14 +41,7 @@ import toml;
 
 alias fileHashes = string[string];
 
-void conditionalCompile(fileHashes filesList){ // used????
-	writeln("conditionalCompile()");
-	foreach(k,v; filesList){
-		writeln(k);
-		}
-	}
-
-final class fileCacheList{
+final class FileCacheList{
 	string dir;
 	fileHashes database;
 	fileHashes differencesDb;
@@ -67,7 +70,7 @@ final class fileCacheList{
 		foreach(k,v; currentValues){writefln("cached %s %s", k, v);}
 
 		// what if a file is REMOVED??
-		writeln("compareAndFindDifferences() - DIFFERENCES");
+		verboseWriteln("compareAndFindDifferences() - DIFFERENCES");
 		foreach(k, v; currentValues){
 			if(k !in oldValues){
 				writefln("\t%30s - %s [NEW]", k, v);
@@ -112,21 +115,21 @@ final class fileCacheList{
 	fileHashes scanCachedHashes(){
 		fileHashes results;
 		try{
-		TOMLDocument doc = parseTOML(cast(string)read(exeConfig.cacheFileName));
-		writeln("scanCachedHashes() - ", exeConfig.cacheFileName);
-		foreach(f, hex; doc["fileHashes"]){
-			writefln("\t%30s - %s", f, hex.str);
-			results[f] = hex.str;
-			}
+			TOMLDocument doc = parseTOML(cast(string)read(exeConfig.cacheFileName));
+			writeln("scanCachedHashes() - ", exeConfig.cacheFileName);
+			foreach(f, hex; doc["fileHashes"]){
+				writefln("\t%30s - %s", f, hex.str);
+				results[f] = hex.str;
+				}
 		}catch(Exception e){
 			writefln("No %s file found, or inaccessable.", exeConfig.cacheFileName); 
 		}
 		return results;
 		}
 
-	string[string] scanHashes(string[] files){
-		string[string] results;
-		writeln("scanHashes() - fileCacheList:");
+	fileHashes scanHashes(string[] files){
+		fileHashes results;
+		writeln("scanHashes() - FileCacheList:");
 		foreach(f; files){
 			string hex = toHexString!(LetterCase.lower)(digest!CRC32(readText(f))).dup;
 			writefln("\t%30s - %s", f, hex);
@@ -136,20 +139,18 @@ final class fileCacheList{
 		}
 	}
 
-struct modeStringConfig{
-	string[string] modePerCompiler;
+struct ModeStringConfig{
+	string[string] modePerCompiler; 
 	}
 
-struct globalConfiguration{
-	//modeStringConfig[] modeStrings; /// e.g. "debug"=["debug"] mode string, "profile"=["release","profile"] mode strings
-	modeStringConfig[string] modeStrings;
-	//string[] modeStrings; /// debug = ["-debug"]
+struct GlobalConfiguration{	
+	ModeStringConfig[string] modeStrings;
 	
 	// [Options]
 	bool automaticallyAddOutputExtension=true;  /// main for linux, main.exe for windows
 	}
 
-struct targetConfiguration{ // windows, linux, etc
+struct TargetConfiguration{ // windows, linux, etc
 	string target;
 	string compilerName;
 	string[] sourcePaths;
@@ -162,28 +163,28 @@ struct targetConfiguration{ // windows, linux, etc
 	string[] sourceFilesFound;
 	}
 
-struct profileConfiguration{ 
+struct ProfileConfiguration{ 
 	string mode; /// full mode string ala "-d -debug -o"
 	string outputFilename = "main"; // automatically adds .exe
 	}
 
-profileConfiguration[string] runToml(){
+ProfileConfiguration[string] runToml(){
 	import toml;
 	import std.conv : to;
 	import std.file : read;
 	TOMLDocument doc;
 
-	writeln(readText(exeConfig.buildScriptFileName));
+	verboseWriteln(readText(exeConfig.buildScriptFileName));
 	doc = parseTOML(cast(string)read(exeConfig.buildScriptFileName));
 	
 	auto compilers = doc["project"]["compilers"].array;
 	foreach(c; compilers){
-		writeln("compilers found: ", c);
+		verboseWriteln("compilers found: ", c);
 		}
 	
 	auto targets = doc["project"]["targets"].array;
 	foreach(t; targets){
-		writeln("targets found: ", t);
+		verboseWriteln("targets found: ", t);
 		}
 
 	template wrapInException(string path){ //fixme bad name. Also. Not used anymore???
@@ -200,7 +201,7 @@ profileConfiguration[string] runToml(){
 				}
 			}", path);
 		}
-	writeln();
+	verboseWriteln();
 
 	globalConfig.automaticallyAddOutputExtension = doc["options"]["automaticallyAddOutputExtension"].boolean;
 
@@ -212,15 +213,15 @@ profileConfiguration[string] runToml(){
 
 	string[] compilerNames = convTOMLtoArray(doc["project"]["compilers"]);
 	foreach(m, n; doc["modeStrings"]){
-		writeln("[",m, "] = ", n[0], "/", n[1], " of type ", n.type); // string
-		modeStringConfig _modeString;
+		verboseWriteln("[",m, "] = ", n[0], "/", n[1], " of type ", n.type); // string
+		ModeStringConfig _modeString;
 		foreach(i, t; n.array){_modeString.modePerCompiler[compilerNames[i]] ~= t.str;}
 		globalConfig.modeStrings[m] = _modeString;
 		}
-	writeln(globalConfig);	
+	verboseWriteln(globalConfig);	
 
 	foreach(t; targets){
-		targetConfiguration tc;
+		TargetConfiguration tc;
 		verboseWriteln("doc", t.str);
 		auto d = doc[t.str];
 		tc.target = t.str;
@@ -233,10 +234,10 @@ profileConfiguration[string] runToml(){
 		tc.libs 				= convTOMLtoArray(d["libs"]);
 
 		foreach(path; tc.sourcePaths){
-				writefln("try scanning path %s for target %s", path, tc.target);
+				verboseWritefln("try scanning path %s for target %s", path, tc.target);
 				try{				
 					foreach(string __path; dirEntries(path, "*.d", SpanMode.shallow)){   
-						writeln("\t", __path);
+						verboseWriteln("\t", __path);
 						tc.sourceFilesFound ~= __path;
 						}
 				}catch(Exception e){
@@ -244,44 +245,55 @@ profileConfiguration[string] runToml(){
 				}
 			}
 		tConfigs[t.str] = tc;
-		writeln("Source files found: ", tc.sourceFilesFound);
+		verboseWriteln("Source files found: ", tc.sourceFilesFound);
 		}
-	profileConfiguration[string] pConfigs;
+	ProfileConfiguration[string] pConfigs;
 	foreach(mode; doc["project"]["profiles"].array){
 		string name = mode.str;
-		writeln("Reading profile: ", name); // "debug", "release", etc
+		verboseWritefln("Reading profile: ", name); // "debug", "release", etc
 		
 		auto buildProfileData = doc[mode.str];
-		writeln("\t", buildProfileData);
-		profileConfiguration pc;
+		verboseWriteln("\t", buildProfileData);
+		ProfileConfiguration pc;
 		auto modeArray = buildProfileData["modesEnabled"].array; // selected modes for configuration
 		string temp;
 		string currentCompiler = "dmd"; // TODO FIXME.  compilerNames[i]?
 		foreach(i, m; modeArray){
-			writeln(i, m);
-			writeln("\tfound mode ", m.str);
+			verboseWriteln(i, m);
+			verboseWritefln("\tfound mode ", m.str);
 			temp ~= globalConfig.modeStrings[m.str].modePerCompiler[currentCompiler] ~ " ";
 			}
 		pc.mode = temp;
-		writefln("\tfull mode string [%s]", temp);		
+		verboseWritefln("\tfull mode string [%s]", temp);		
 		pConfigs[name] = pc;
 		}
 
 	return pConfigs;
 	}
 
+/// Only print if doPrintVerbose is true, exact replacement for writeln
 void verboseWriteln(A...)(A a){  // todo: what about fln version. Pass in a std.format is all needed?
-	if(exeConfig.doPrintVerbose){
-		foreach(t; a)
-			writeln(t);
-		}
+	if(exeConfig.doPrintVerbose)foreach(t; a)writeln(t);
 	}
 
-struct exeConfigType{
+/// adapted from from function signatures here: https://github.com/dlang/phobos/blob/master/std/stdio.d
+void verboseWritefln(alias fmt, A...)(A args)
+    if (isSomeString!(typeof(fmt))){
+		if(!exeConfig.doPrintVerbose)return;
+        return writefln(fmt, args);
+    }
+
+/// adapted from from function signatures here: https://github.com/dlang/phobos/blob/master/std/stdio.d
+void verboseWritefln(Char, A...)(in Char[] fmt, A args){
+		if(!exeConfig.doPrintVerbose)return;
+		writefln(fmt, args);        
+    }
+
+struct ExeConfigType{
 	bool doCachedCompile = true;
 	bool doRunCompiler = false;
 	bool didCompileSucceed = false;
-	bool doPrintVerbose = true; /// for error troubleshooting
+	bool doPrintVerbose = false; /// for error troubleshooting
 	string modeSet="default"; // todo: change to enum or whatever. /// This is the builder mode state variable! NOT a "mode"/profile/etc. 'default' to start.
 	
 	string selectedProfile = "release";
@@ -333,7 +345,7 @@ void runLint(){
 
 int parseModeInit(string arg){
 	import std.string;
-	writefln("parseModeInit(%s)", arg);
+	verboseWritefln("parseModeInit(%s)", arg);
 	switch(arg.strip){
 		case "build": exeConfig.doRunCompiler = true ; exeConfig.modeSet = "build"; return 0; break;
 		case "try"  : exeConfig.doRunCompiler = false; exeConfig.modeSet = "build"; return 0; break;
@@ -350,35 +362,34 @@ bool isAny(string t, string v){ import std.string : indexOfAny; return (t.indexO
 
 int parseModeBuild(string arg){
 	import std.string : indexOfAny, toLower;
-
-	writefln("parseModeBuild(%s)", arg);	
+	verboseWritefln("parseModeBuild(%s)", arg);	
 	immutable long n = arg.indexOfAny("=");
-	if(n == -1){writeln("Missing equals?"); terminateEarlyString(arg); return -1;} // args must be in key=value, so if there's no equal it's invalid.
-	writefln("matching [%s] = [%s]", arg[0..n], arg[n+1..$]);
+	if(n == -1){writeln("Error. Option missing equals?"); terminateEarlyString(arg); return -1;} // args must be in key=value, so if there's no equal it's invalid.
+	verboseWritefln("matching [%s] = [%s]", arg[0..n], arg[n+1..$]);
 	immutable string option=arg[0..n];
 	immutable string value=arg[n+1..$];
 	// note we ONLY change case of option! We don't want to
 	//  accidentally change case of a compiler flag string!
 	switch(option.toLower){
 		case "profile":
-			writeln("Setting profile=", value.toLower);
+			verboseWriteln("Setting profile=", value.toLower);
 			exeConfig.selectedProfile = value.toLower;
 			// look for profile names? We need to scan profiles before this?
 			// or just let it rangeException out later.
 			return 0;
 		break;
 		case "target":
-			writeln("Setting target=", value.toLower);
+			verboseWriteln("Setting target=", value.toLower);
 			exeConfig.selectedTargetOS = value.toLower;
 			return 0;
 		break;
 		case "compiler":
-			writeln("Setting compiler=", value.toLower);
+			verboseWriteln("Setting compiler=", value.toLower);
 			exeConfig.selectedCompiler = value.toLower;
 			return 0;
 		break;
 		case "compilerflags":
-			writeln("Setting compilerflags=", value);
+			verboseWriteln("Setting compilerflags=", value);
 			if(value.isAny(" "))
 				exeConfig.extraCompilerFlags = "\"" ~ value ~ "\""; // [myString stuff] becomes ["myString stuff"]
 				 // .replace("\"", "\\\"")  but how do we handle embedded strings? What does OS send? Maybe already good enough.
@@ -387,7 +398,7 @@ int parseModeBuild(string arg){
 			return 0;
 		break;
 		case "linkerflags":
-			writeln("Setting linkerflags=", value);
+			verboseWriteln("Setting linkerflags=", value);
 			if(value.isAny(" "))
 				exeConfig.extraLinkerFlags = "\"" ~ value ~ "\""; // [myString stuff] becomes ["myString stuff"]
 				 // .replace("\"", "\\\"")  but how do we handle embedded strings? What does OS send? Maybe already good enough.
@@ -410,8 +421,7 @@ void terminateEarlyString(string arg){
 	}
 
 void parseCommandline(string[] myArgs){
-	writeln("args:", myArgs);
-
+	verboseWriteln("args:", myArgs);
 	foreach(arg; myArgs){
 			if(exeConfig.modeSet=="default"){if(parseModeInit(arg)){return;}}
 			else if(exeConfig.modeSet=="build"){if(parseModeBuild(arg)){return;}}
@@ -428,7 +438,7 @@ void commandClean(){
 	} // TODO FIX ME BUG
 
 void commandBuild(){
-	profileConfiguration[string]  pConfigs = runToml();
+	ProfileConfiguration[string]  pConfigs = runToml();
 	writeln(pConfigs);
     string filesList = "";
 
@@ -444,19 +454,20 @@ void commandBuild(){
 		}
 	writefln("\"%s\"\n", filesList);
 
-	auto fcl = new fileCacheList(tConfigs[exeConfig.selectedTargetOS].sourceFilesFound);
+	auto fcl = new FileCacheList(tConfigs[exeConfig.selectedTargetOS].sourceFilesFound);
 	string[] changedFiles = fcl.getDifferences();
 	writeln("Changed files detected:");
 	foreach(f; changedFiles){
 		writeln("\t", f);
 		}
-
+	writeln();
     writeln("Library paths:");
 	string libPathList = "";
 	foreach(libpath; tConfigs[exeConfig.selectedTargetOS].libPaths){
 		switch(tConfigs[exeConfig.selectedTargetOS].target){
 			case("linux"):   libPathList ~= "-L-L"~libpath~" "; 		break;
 			case("windows"): libPathList ~= "-L/LIBPATH:"~libpath~" ";	break;
+			case("macosx") : assert(0, "macosx not tested");
 			default:		 assert(0, format("invalid target name [%s]", exeConfig.selectedProfile)); break;
 			}
 		}
@@ -466,6 +477,9 @@ void commandBuild(){
 	writefln("Buildname: %s (%s/%s)",	exeConfig.selectedProfile,
 			exeConfig.selectedTargetOS, exeConfig.selectedCompiler);
 	writeln("");
+	if(exeConfig.doCachedCompile){
+		writeln("Attempting incremental compile.\n");
+		}
 
     immutable string flags = pConfigs[exeConfig.selectedProfile].mode;
 	string runString;
@@ -495,10 +509,10 @@ void commandBuild(){
 		bool stopOnFirstError = true; /// do we stop on the first errored compile, or attempt all? exeConfig option?
 		bool hasErrorOccurred = false; 
 		foreach(file; changedFiles){
-			string execString = format("dmd -c -od=/temp/ %s %s", file, libPathList);
+			string execString = format("dmd -c -I/src/ -od=/temp/ %s %s", file, libPathList);
 			
 			if(exeConfig.doRunCompiler){
-				writeln("trying to execute:\n", execString);
+				writeln("trying to execute:\n\t", execString);
 				auto exec = executeShell(execString);				
 				if(exec.status != 0){
 					writefln("Compilation of %s failed:\n%s", file, exec.output);
@@ -528,14 +542,12 @@ void commandBuild(){
 				writefln("Compilation succeeded.\n");
 				}
 			}
+		}
 	}
 
-	
-	}
-
-globalConfiguration globalConfig;
-targetConfiguration[string] tConfigs;
-exeConfigType exeConfig;
+GlobalConfiguration globalConfig;
+TargetConfiguration[string] tConfigs;
+ExeConfigType exeConfig;
 
 void setupDefaultOSstring(){
 	exeConfig.selectedTargetOS = "excuse me, wat"; // default fail case.

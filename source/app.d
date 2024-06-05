@@ -1,6 +1,9 @@
 /+ 	
 	masterBuilDer		
 		- mb for short?
+		- we can COLORIZE output with ascii codes. [can we detect a proper terminal on windows?]
+			- highlight output path only, in the output string. or other important info
+
 
 		- still not dumping to temp directory (partially related to next point)
 
@@ -571,8 +574,9 @@ void commandBuild(){
 				file,
 				libPathList, file
 					.replace(".d", ".obj")
-					.replace(tConfigs[exeConfig.selectedTargetOS].sourcePaths[0], // FIXME, only one path. How do we deal with multiple src paths?
-							tConfigs[exeConfig.selectedTargetOS].intermediatePath));
+					.replace(tConfigs[exeConfig.selectedTargetOS].sourcePaths[0],
+							tConfigs[exeConfig.selectedTargetOS].intermediatePath)); 
+							 // FIXME, only one path. How do we deal with multiple src paths?
 			
 			if(exeConfig.doRunCompiler){
 				writeln("trying to execute:\n\t", execString);
@@ -592,7 +596,8 @@ void commandBuild(){
 		// then if they all succeed, compile the final product.
 		import std.string : replace;
 		runString = "dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ 
-		  	" " ~ flags ~ " " ~	filesList.replace(".d",".obj").replace("./src/",".\\temp\\") ~ " " ~ libPathList ~ " " ~ 
+		  	" " ~ flags ~ " " ~	filesList.replace(".d",".obj").replace(tConfigs[exeConfig.selectedTargetOS].sourcePaths[0],
+							tConfigs[exeConfig.selectedTargetOS].intermediatePath) ~ " " ~ libPathList ~ " " ~ 
 			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags; // FIX ME^^^^
 			// we need to remove the path part (which is combined into a filename+path currently)
 			// and substitute our own intermediate path

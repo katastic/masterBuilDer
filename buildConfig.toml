@@ -8,19 +8,21 @@
     automaticallyAddOutputExtension = true   # main for linux, main.exe for windows
 
 [windows]
-    sourcePaths = [ './src/', './toml/src/toml' ]
+    sourcePaths = [ 'C:\git\dlawn\src\' ]
     recursiveSourcePaths = [ ]
     libPaths = [
         '.',
         'C:\git\dlawn\winbuilddeps\lib\', 
-        'C:\git\dlawn\winbuilddeps\dallegro5', 
-        'C:\git\dlawn\toml',
-        'C:\git\dlawn\src'] 
+        'C:\git\dlawn\winbuilddeps\dallegro5\', 
+        'C:\git\dlawn\toml\',
+        'C:\git\dlawn\src\'] 
     recursiveLibPaths = []
     libs = [ "toml" ]
+    includePaths = ['C:\git\dlawn\src\', 'C:\git\dlawn\toml\src\', 'C:\git\dlawn\'] # we could auto add the normal source directory
+    intermediatePath = 'C:\git\masterBuilDer\temp\' # where to store obj files for incremental build
 
 [linux]
-    sourcePaths = [ './src/', './toml/src/toml' ]
+    sourcePaths = [ 'C:\git\dlawn\src', 'C:\git\dlawn\toml\src\toml' ]
     recursiveSourcePaths = [ ]
     libPaths = [
         '.',
@@ -30,6 +32,8 @@
         'C:\git\dlawn\src'] 
     recursiveLibPaths = []
     libs = [ "toml" ]
+    includePaths = ['C:\git\dlawn\toml\src\toml', 'C:\git\dlawn\allegro5']
+    intermediatePath = './temp/' # where to store obj files for incremental build
 
 [setupCode]
     getDeps = ["git submodule init", "git submodule init"]
@@ -58,7 +62,7 @@
 
 [release]
     name = "release"
-    modesEnabled = ["optimize", "other", "ignoreDepreciated", "noObjectIntermediates"]
+    modesEnabled = ["optimize", "other", "ignoreDepreciated"]
     extraCompilerFlags = "" # these won't be cross compiler. add your own [modeStrings] for those.
     extraLinkerFlags = ""
     outputFilename = "main" # auto add .exe for windows or change [automaticallyAddOutputExtension]
@@ -67,7 +71,7 @@
 
 [debug]
     name = "debug"
-    modesEnabled = ["debug", "optimize", "ignoreDepreciated", "noObjectIntermediates"]
+    modesEnabled = ["debug", "optimize", "ignoreDepreciated"]
     extraCompilerFlags = "" # these won't be cross compiler. add your own [modeStrings] for those.
     extraLinkerFlags = ""
     outputFilename = "main" # auto add .exe for windows or change [automaticallyAddOutputExtension]

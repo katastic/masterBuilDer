@@ -1,1 +1,0 @@
-int srgv(){return 1351;}

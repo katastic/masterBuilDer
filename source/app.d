@@ -2,6 +2,12 @@
 	masterBuilDer		
 		- mb for short?
 
+		- we could make a lot of this easier if we split files into 
+			{path, filename}
+			or even
+			{path, filename{name, extension}}
+				also how do we do absolute vs relative paths?
+
 	tools we could add:
 		- fuzzy importer. Tries to remove each import and see if it still compiles. 
 		- create [init] buildscript. Dumps the default values into a TOML file!
@@ -21,9 +27,9 @@
 
 	todo:
 		- figure out dmd binary file compilation import issue.
-			- specify -I/src/ for folders that get imported. May have to include all source 
+			-> specify -I/src/ for folders that get imported. May have to include all source 
 				and recursiveSource folders
-		- filesList is a bunch of FILES. We need to trim each `.d` and replace it with `.obj`. 
+		-> filesList is a bunch of FILES. We need to trim each `.d` and replace it with `.obj`. 
 			- Might be as simple as string replace. But what if some moron has .d _inside_ their filename?
 		- what if file is REMOVED?
 		- do RECURSIVE file path scans work? And also manual lib names (instead of paths)
@@ -153,19 +159,26 @@ struct GlobalConfiguration{
 struct TargetConfiguration{ // windows, linux, etc
 	string target;
 	string compilerName;
+	
 	string[] sourcePaths;
 	string[] recursiveSourcePaths;
 	string[] libPaths;
 	string[] recursiveLibPaths;
 	string[] libs;
 
+	string[] includePaths;   /// where to find dependency source files (but NOT compile them)
+	string intermediatePath; /// where intermediate binary files go
+
 	// enumerated data
 	string[] sourceFilesFound;
+	//string[] sourceFilesFoundPlusPath;
+	//string[] sourceFilesFoundPlusIntermediatePath;
 	}
 
 struct ProfileConfiguration{ 
 	string mode; /// full mode string ala "-d -debug -o"
 	string outputFilename = "main"; // automatically adds .exe
+
 	}
 
 ProfileConfiguration[string] runToml(){
@@ -233,12 +246,17 @@ ProfileConfiguration[string] runToml(){
 		tc.recursiveLibPaths 	= convTOMLtoArray(d["recursiveLibPaths"]);
 		tc.libs 				= convTOMLtoArray(d["libs"]);
 
+		tc.includePaths 		= convTOMLtoArray(d["includePaths"]);
+		tc.intermediatePath 	= d["intermediatePath"].str;
+
 		foreach(path; tc.sourcePaths){
 				verboseWritefln("try scanning path %s for target %s", path, tc.target);
 				try{				
 					foreach(string __path; dirEntries(path, "*.d", SpanMode.shallow)){   
 						verboseWriteln("\t", __path);
 						tc.sourceFilesFound ~= __path;
+						//tc.sourceFilesFoundPlusPath ~= __path;
+						//tc.sourceFilesFoundPlusIntermediatePath ~= __path;
 						}
 				}catch(Exception e){
 					writeln("Exception occured: ", e);
@@ -247,6 +265,7 @@ ProfileConfiguration[string] runToml(){
 		tConfigs[t.str] = tc;
 		verboseWriteln("Source files found: ", tc.sourceFilesFound);
 		}
+	
 	ProfileConfiguration[string] pConfigs;
 	foreach(mode; doc["project"]["profiles"].array){
 		string name = mode.str;
@@ -267,7 +286,6 @@ ProfileConfiguration[string] runToml(){
 		verboseWritefln("\tfull mode string [%s]", temp);		
 		pConfigs[name] = pc;
 		}
-
 	return pConfigs;
 	}
 
@@ -290,6 +308,7 @@ void verboseWritefln(Char, A...)(in Char[] fmt, A args){
     }
 
 struct ExeConfigType{
+	bool doParallelCachedCompile = true;
 	bool doCachedCompile = true;
 	bool doRunCompiler = false;
 	bool didCompileSucceed = false;
@@ -477,9 +496,6 @@ void commandBuild(){
 	writefln("Buildname: %s (%s/%s)",	exeConfig.selectedProfile,
 			exeConfig.selectedTargetOS, exeConfig.selectedCompiler);
 	writeln("");
-	if(exeConfig.doCachedCompile){
-		writeln("Attempting incremental compile.\n");
-		}
 
     immutable string flags = pConfigs[exeConfig.selectedProfile].mode;
 	string runString;
@@ -505,11 +521,53 @@ void commandBuild(){
 		writeln("Would have tried to execute the following string:");
 		writeln("\t",runString);
 		}
-	}else{
+	}else{		
+		writeln("Attempting incremental compile.\n");
+		
 		bool stopOnFirstError = true; /// do we stop on the first errored compile, or attempt all? exeConfig option?
 		bool hasErrorOccurred = false; 
+		if(exeConfig.doParallelCachedCompile == false){
+			writeln(" - single threaded");
+			foreach(file; changedFiles){
+				string execString = format("dmd -c -I/src/ -od=/temp/ %s %s", file, libPathList);
+				
+				if(exeConfig.doRunCompiler){
+					writeln("trying to execute:\n\t", execString);
+					auto exec = executeShell(execString);				
+					if(exec.status != 0){
+						writefln("Compilation of %s failed:\n%s", file, exec.output);
+						if(stopOnFirstError)break;
+						}else{
+						writefln("Compilation of %s succeeded.\n", file);
+						}
+					}else{
+					writeln("Would have tried to execute (file to obj):\n\n\t", execString);
+					}
+				}
+
+			if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
+		}else{
+		writeln(" - multi threaded");
+		// TODO ?
+		// Also, if we need a dependency graph of build order, we could figure one
+		// out either automatically (just keep compiling random ones until the order works), or allow manual.
+
+		// we might want to store each ones stdout/stderr and display them sequentually so there's no
+		// stdout race conditions, and also only display stderr of those that fail.
+		import std.parallelism;
+
+		//foreach(file; taskPool.parallel(changedFiles, 1)){
 		foreach(file; changedFiles){
-			string execString = format("dmd -c -I/src/ -od=/temp/ %s %s", file, libPathList);
+			string includePathsStr;
+			foreach(p; tConfigs[exeConfig.selectedTargetOS].includePaths){
+				includePathsStr ~= format("-I%s ", p);
+				}
+			import std.string;
+			string execString = format("dmd -c %s -od=%s %s %s -of=%s",   // does -od even work??
+				includePathsStr,
+				tConfigs[exeConfig.selectedTargetOS].intermediatePath,
+				file,
+				libPathList, file.replace(".d", ".obj"));
 			
 			if(exeConfig.doRunCompiler){
 				writeln("trying to execute:\n\t", execString);
@@ -524,20 +582,25 @@ void commandBuild(){
 				writeln("Would have tried to execute (file to obj):\n\t", execString);
 				}
 			}
-		if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
+			if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
+		}
 		// then if they all succeed, compile the final product.
 		import std.string : replace;
 		runString = "dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ 
-		  	" " ~ flags ~ " " ~	filesList.replace(".d",".obj") ~ " " ~ libPathList ~ " " ~ 
-			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags;
+		  	" " ~ flags ~ " " ~	filesList.replace(".d",".obj").replace("./src/",".\\temp\\") ~ " " ~ libPathList ~ " " ~ 
+			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags; // FIX ME^^^^
+			// we need to remove the path part (which is combined into a filename+path currently)
+			// and substitute our own intermediate path
 
 		if(!exeConfig.doRunCompiler){
+			writeln();
 			writeln("Would have tried to execute (executable):\n\t", runString);
 			}else{
 			writeln("Trying to execute:\n\t", runString);
 			auto dmd = executeShell(runString);				
 			if(dmd.status != 0){
-				writefln("Compilation failed:\n%s", dmd.output);
+				writeln();
+				writefln("Compilation failed:\n\n%s", dmd.output);
 				}else{
 				writefln("Compilation succeeded.\n");
 				}

@@ -2,6 +2,8 @@
 	masterBuilDer		
 		- mb for short?
 
+		- still not dumping to temp directory (partially related to next point)
+
 		- we could make a lot of this easier if we split files into 
 			{path, filename}
 			or even
@@ -567,7 +569,10 @@ void commandBuild(){
 				includePathsStr,
 				tConfigs[exeConfig.selectedTargetOS].intermediatePath,
 				file,
-				libPathList, file.replace(".d", ".obj"));
+				libPathList, file
+					.replace(".d", ".obj")
+					.replace(tConfigs[exeConfig.selectedTargetOS].sourcePaths[0], // FIXME, only one path. How do we deal with multiple src paths?
+							tConfigs[exeConfig.selectedTargetOS].intermediatePath));
 			
 			if(exeConfig.doRunCompiler){
 				writeln("trying to execute:\n\t", execString);

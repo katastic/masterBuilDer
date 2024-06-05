@@ -21,7 +21,7 @@
     includePaths = ['C:\git\dlawn\src\', 'C:\git\dlawn\toml\src\', 'C:\git\dlawn\'] # we could auto add the normal source directory
     intermediatePath = 'C:\git\masterBuilDer\temp\' # where to store obj files for incremental build
 
-[linux]
+[linux] ## FIX ME
     sourcePaths = [ 'C:\git\dlawn\src', 'C:\git\dlawn\toml\src\toml' ]
     recursiveSourcePaths = [ ]
     libPaths = [

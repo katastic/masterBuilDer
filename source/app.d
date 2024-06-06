@@ -1,6 +1,8 @@
 module app;
+import utility;
+
 import std.process, std.path, std.stdio;
-import std.digest.crc, std.format, std.file;
+import std.format, std.file;
 import toml;
 import std.parallelism;
 import std.string : indexOf, indexOfAny, lastIndexOf, replace, toLower, strip;
@@ -8,20 +10,8 @@ import std.algorithm : map;
 import std.array : array;
 import std.conv : to;
 
-alias fileHashes = string[string];
-
-bool isAny(string src, string match){ return (src.indexOfAny(match) != -1); } /// Is any string src in match? return: boolean
-  
-/// Is there any string src in match after AfterThis matches? return: boolean. false if either condition fails
-bool isAnyAfter(string src, string match, string afterThis){
-	return (src.indexOfAny(afterThis) != -1) && (src.indexOfAny(match) != -1);
-	}
-
-string[] convTOMLtoArray(TOMLValue t){ 
-	return t.array.map!((o) => o.str).array;
-	}
-
-final class FileCacheList{
+final class FileCacheList{	
+	import std.digest.crc;
 	string dir;
 	fileHashes database;
 	fileHashes differencesDb;
@@ -303,25 +293,10 @@ ProfileConfiguration[string] runToml(){
 	return pConfigs;
 	}
 
-/// Only print if doPrintVerbose is true, exact replacement for writeln
-void verboseWriteln(A...)(A a){  // todo: what about fln version. Pass in a std.format is all needed?
-	if(exeConfig.doPrintVerbose)foreach(t; a)writeln(t);
-	}
-
-/// adapted from from function signatures here: https://github.com/dlang/phobos/blob/master/std/stdio.d
-void verboseWritefln(alias fmt, A...)(A args)
-    if (isSomeString!(typeof(fmt))){
-		if(!exeConfig.doPrintVerbose)return;
-        return writefln(fmt, args);
-    }
-
-/// adapted from from function signatures here: https://github.com/dlang/phobos/blob/master/std/stdio.d
-void verboseWritefln(Char, A...)(in Char[] fmt, A args){
-		if(!exeConfig.doPrintVerbose)return;
-		writefln(fmt, args);        
-    }
-
 struct ExeConfigType{
+	bool forwardRemainingArguments = false;
+	string forwardArguments = "";
+
 	bool doParallelCachedCompile = true;
 	bool doCachedCompile = true;
 	bool doRunCompiler = false;
@@ -331,7 +306,7 @@ struct ExeConfigType{
 	
 	string selectedProfile = "release";
 	string selectedCompiler = "dmd";
-	string selectedTargetOS = "";  // set by version statement in main.
+	string selectedTargetOS = "windows";  // set by version statement in main.
 
 	string buildScriptFileName = "buildConfig.toml"; /// Unless overriden with option TODO
 	string cacheFileName = "buildFileCache.toml"; // should this be in the buildConfig?
@@ -393,6 +368,13 @@ int parseModeInit(string arg){
 int parseModeBuild(string arg){
 	verboseWritefln("parseModeBuild(%s)", arg);	
 	immutable long n = arg.indexOfAny("=");
+
+	if(arg == "--"){
+		writefln("Forward argument mode detected!");
+		exeConfig.forwardRemainingArguments = true;
+		return 0;
+		}
+
 	if(n == -1){writeln("Error. Option missing equals?"); terminateEarlyString(arg); return -1;} // args must be in key=value, so if there's no equal it's invalid.
 	verboseWritefln("matching [%s] = [%s]", arg[0..n], arg[n+1..$]);
 	immutable string option=arg[0..n];
@@ -444,6 +426,10 @@ int parseModeBuild(string arg){
 	return -1;
 	}
 
+void setForwardArguments(string arg){
+	exeConfig.forwardArguments ~= arg ~ " ";
+	}
+
 void terminateEarlyString(string arg){
 	writeln("Unrecognized command: ", arg);
 	displayHelp();
@@ -452,16 +438,25 @@ void terminateEarlyString(string arg){
 void parseCommandline(string[] myArgs){
 	verboseWriteln("args:", myArgs);
 	foreach(arg; myArgs){
-			if(exeConfig.modeSet=="default"){if(parseModeInit(arg)){return;}}
-			else if(exeConfig.modeSet=="build"){if(parseModeBuild(arg)){return;}}
-			else if(exeConfig.modeSet=="helper"){displayHelp();}
-			else if(exeConfig.modeSet=="quote"){displayQuote();}
+			if(exeConfig.forwardRemainingArguments){setForwardArguments(arg);}
+			else{
+				if(exeConfig.modeSet=="default"){if(parseModeInit(arg)){return;}}
+				else if(exeConfig.modeSet=="build"){if(parseModeBuild(arg)){return;}}
+				else if(exeConfig.modeSet=="helper"){displayHelp();}
+				else if(exeConfig.modeSet=="quote"){displayQuote();}
+			}
 		}
 	if(exeConfig.modeSet == "build")commandBuild();
 	return;
 	}
 
+void commandRun(){
+	// exeConfig.forwardArguments
+	}
+
 void commandClean(){
+	// - delete intermediate directory
+	// - delete executable
 	} // TODO FIX ME BUG
 
 void commandBuild(){
@@ -479,8 +474,7 @@ void commandBuild(){
 	foreach(t; tConfigs)writeln(t.sourceFilesFound);
 	foreach(file; tConfigs[targetOS].sourceFilesFound2){
 		filesList ~= file.fullPathAndName ~ " "; //file ~ " ";
-		filesObjList ~= tConfigs[targetOS].intermediatePath ~ file.filename.replace(".d",".obj") ~ " "; //file ~ " ";
-		//FilePath f = FilePath(file);
+		filesObjList ~= tConfigs[targetOS].intermediatePath ~ file.filename.replace(".d",".obj") ~ " ";
 		}
 	writeln("filesObjList - ", filesObjList);
 	writefln("Files List \"%s\"\n", filesList);
@@ -573,9 +567,6 @@ void commandBuild(){
 		// stdout race conditions, and also only display stderr of those that fail.
 
 		try{
-
-			// does taskpool simply explode on being used on a associated array?
-		//foreach(ref file; changedFiles){
 		foreach(immutable file; taskPool.parallel(changedFiles)){
 			immutable FilePath filepath = FilePath(file);
 			string fileStr = tConfigs[targetOS].intermediatePath ~ filepath.basename ~ ".obj";
@@ -639,6 +630,10 @@ __gshared GlobalConfiguration globalConfig;
 __gshared TargetConfiguration[string] tConfigs;
 __gshared ExeConfigType exeConfig;
 
+void setup(){
+	setVerboseModeVariable(&exeConfig.doPrintVerbose);
+	}
+
 void setupDefaultOSstring(){
 	exeConfig.selectedTargetOS = "excuse me, wat"; // default fail case.
 	version(Windows)exeConfig.selectedTargetOS = "windows";
@@ -647,10 +642,12 @@ void setupDefaultOSstring(){
 	}
 
 int main(string[] args){
-	setupDefaultOSstring();
-	writeln(args);
+	setup();
+	writefln("masterBuilder %s", args[1..$]);
 	if(args.length > 1){
 		parseCommandline(args[1..$]);
+		}else{
+		displayHelp();
 		}
     return 0;
 	}

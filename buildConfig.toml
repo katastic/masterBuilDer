@@ -33,7 +33,7 @@
     recursiveLibPaths = []
     libs = [ "toml" ]
     includePaths = ['C:\git\dlawn\toml\src\toml', 'C:\git\dlawn\allegro5']
-    intermediatePath = './temp/' # where to store obj files for incremental build
+    intermediatePath = '.\temp\' # where to store obj files for incremental build
 
 [setupCode]
     getDeps = ["git submodule init", "git submodule init"]

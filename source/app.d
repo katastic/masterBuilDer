@@ -1,98 +1,25 @@
-/+ 	
-	masterBuilDer		
-		- mb for short?
-		- we can COLORIZE output with ascii codes. [can we detect a proper terminal on windows?]
-			- highlight output path only, in the output string. or other important info
-
-			- not sure how 'try' would work with intermediates. it would still have to make the intermediates just not the final build.
-				- also not sure it's even needed once the code works. It's basically just "build + debug logs"
-
-		- still not properly dumping to temp directory (partially related to next point)
-			- how do we handle multiple sourcepaths? 1 temp path for each source.
-				- HOWEVER, what about recursive?
-
-			- easiest could be something dumb: temp directory plus full normal path replicated.
-				(but we gotta make all the folders)
-
-				so 
-					/src/
-					/src/my/
-					/src/my/stuff
-
-				becomes
-					/temp/src/
-					/temp/src/my
-					/temp/src/my/stuff
-
-		- we could make a lot of this easier if we split files into 
-			{path, filename}
-			or even
-			{path, filename{name, extension}}
-				also how do we do absolute vs relative paths?
-
-				std.path probably does this all minus my personal flair on the API.
-
-	tools we could add:
-		- fuzzy importer. Tries to remove each import and see if it still compiles. 
-		- create [init] buildscript. Dumps the default values into a TOML file!
-		- scan for (remove?) too many repeating newlines (dLawn scripts)
-		- [line] counts? pretty simple. Could support random scripts after succeeding builds though.
-		- list any FIXME, TODO, etc in source files. also LAST if you want to mark where you worked last at end off day.
-		- [unit] tests
-		- support ASCII colorizing? re-implement python pygments without having to invoke it or dep on it?
-		- for fun: FUZZY FIXER. Use genetic algorithm to try to match nearest wrong/mispelled string to correct one.
-
-		- could support override= for overriding any build config. So you can specify a different
-		 output target name or build line for testing stuff quickly. But lets be honest, editinng 
-		 the config will be just as fast.
-
-		 - help options
-		 	- enumerate all the custom option flags that can be set. exeConfig, profileConfig, etc.
-
-	todo:
-		- figure out dmd binary file compilation import issue.
-			-> specify -I/src/ for folders that get imported. May have to include all source 
-				and recursiveSource folders
-		-> filesList is a bunch of FILES. We need to trim each `.d` and replace it with `.obj`. 
-			- Might be as simple as string replace. But what if some moron has .d _inside_ their filename?
-		- what if file is REMOVED?
-		- do RECURSIVE file path scans work? And also manual lib names (instead of paths)
-		- dump individual compiled files into a temp directory (specified WHERE?)
-		- alternate cachefile name
-		- why do we SCAN FILES on alternative OS/configurations??? It's just going to exception out.
-
-	- do we store cached files PER PROFILE??? Because if 5we change profile the file caches aren't updated. 
-			- Maybe store each profile in its own section.
-
-
-
-	special scripts for profiles. Kinda already supported just remove scanning.
-	 - "scan" (or other name. Scans for all TODO, FIXME, etc)
-	 - "lines" (lines of code)
-	 - "
-+/
 module app;
 import std.process, std.path, std.stdio;
 import std.digest.crc, std.format, std.file;
 import toml;
 import std.parallelism;
-import std.string;
+import std.string : indexOf, indexOfAny, lastIndexOf, replace, toLower, strip;
+import std.algorithm : map;
+import std.array : array;
+import std.conv : to;
 
 alias fileHashes = string[string];
 
-bool isAny(string src, string match){ import std.string : indexOfAny; return (src.indexOfAny(match) != -1); } /// Is any string src in match? return: boolean
+bool isAny(string src, string match){ return (src.indexOfAny(match) != -1); } /// Is any string src in match? return: boolean
   
 /// Is there any string src in match after AfterThis matches? return: boolean. false if either condition fails
 bool isAnyAfter(string src, string match, string afterThis){
-	import std.string : indexOfAny; 
 	if (src.indexOfAny(afterThis) != -1)
 		return (src.indexOfAny(match) != -1);
 	return false;
 	}
 
 string[] convTOMLtoArray(TOMLValue t){ 
-	import std.algorithm : map;
-	import std.array : array;
 	return t.array.map!((o) => o.str).array;
 	}
 
@@ -223,7 +150,6 @@ struct FilePath{
 		}
 
 	void computeData(){
-		import std.string;
 		alias fp = fullPathAndName;
 		// what if we have multiple dots or dots in the directory names?! We need the LAST one.
 		// and it has to occur _after_ any slashes. [also slashes must be OS specific]
@@ -288,8 +214,6 @@ struct ProfileConfiguration{ /// "release", "debug", special stuff like "scanme"
 
 ProfileConfiguration[string] runToml(){
 	import toml;
-	import std.conv : to;
-	import std.file : read;
 	TOMLDocument doc;
 
 	verboseWriteln(readText(exeConfig.buildScriptFileName));
@@ -302,7 +226,6 @@ ProfileConfiguration[string] runToml(){
 	foreach(t; targets)verboseWriteln("targets found: ", t);
 
 	template wrapInException(string path){ //fixme bad name. Also. Not used anymore???
-		import std.format;		
     	const char[] wrapInException = format("
 			{
 				try{
@@ -456,7 +379,6 @@ void runLint(){
 	}
 
 int parseModeInit(string arg){
-	import std.string;
 	verboseWritefln("parseModeInit(%s)", arg);
 	switch(arg.strip){
 		case "build": exeConfig.doRunCompiler = true ; exeConfig.modeSet = "build"; return 0; break;
@@ -471,7 +393,6 @@ int parseModeInit(string arg){
 	}
 
 int parseModeBuild(string arg){
-	import std.string : indexOfAny, toLower;
 	verboseWritefln("parseModeBuild(%s)", arg);	
 	immutable long n = arg.indexOfAny("=");
 	if(n == -1){writeln("Error. Option missing equals?"); terminateEarlyString(arg); return -1;} // args must be in key=value, so if there's no equal it's invalid.
@@ -559,7 +480,6 @@ void commandBuild(){
     writeln("Files to compile [", targetOS,"]");
 	foreach(t; tConfigs)writeln(t.sourceFilesFound);
 	foreach(file; tConfigs[targetOS].sourceFilesFound2){
-		import std.string : replace;
 		filesList ~= file.fullPathAndName ~ " "; //file ~ " ";
 		filesObjList ~= tConfigs[targetOS].intermediatePath ~ file.filename.replace(".d",".obj") ~ " "; //file ~ " ";
 		//FilePath f = FilePath(file);

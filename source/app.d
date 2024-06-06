@@ -4,14 +4,30 @@
 		- we can COLORIZE output with ascii codes. [can we detect a proper terminal on windows?]
 			- highlight output path only, in the output string. or other important info
 
+		- still not properly dumping to temp directory (partially related to next point)
+			- how do we handle multiple sourcepaths? 1 temp path for each source.
+				- HOWEVER, what about recursive?
 
-		- still not dumping to temp directory (partially related to next point)
+			- easiest could be something dumb: temp directory plus full normal path replicated.
+				(but we gotta make all the folders)
+
+				so 
+					/src/
+					/src/my/
+					/src/my/stuff
+
+				becomes
+					/temp/src/
+					/temp/src/my
+					/temp/src/my/stuff
 
 		- we could make a lot of this easier if we split files into 
 			{path, filename}
 			or even
 			{path, filename{name, extension}}
 				also how do we do absolute vs relative paths?
+
+				std.path probably does this all minus my personal flair on the API.
 
 	tools we could add:
 		- fuzzy importer. Tries to remove each import and see if it still compiles. 
@@ -44,6 +60,13 @@
 
 	- do we store cached files PER PROFILE??? Because if 5we change profile the file caches aren't updated. 
 			- Maybe store each profile in its own section.
+
+
+
+	special scripts for profiles. Kinda already supported just remove scanning.
+	 - "scan" (or other name. Scans for all TODO, FIXME, etc)
+	 - "lines" (lines of code)
+	 - "
 +/
 module app;
 import std.process, std.path, std.stdio;
@@ -51,6 +74,22 @@ import std.digest.crc, std.format, std.file;
 import toml;
 
 alias fileHashes = string[string];
+
+bool isAny(string src, string match){ import std.string : indexOfAny; return (src.indexOfAny(match) != -1); } /// Is any string src in match? return: boolean
+  
+/// Is there any string src in match after AfterThis matches? return: boolean. false if either condition fails
+bool isAnyAfter(string src, string match, string afterThis){
+	import std.string : indexOfAny; 
+	if (src.indexOfAny(afterThis) != -1)
+		return (src.indexOfAny(match) != -1);
+	return false;
+	}
+
+string[] convTOMLtoArray(TOMLValue t){ 
+	import std.algorithm : map;
+	import std.array : array;
+	return t.array.map!((o) => o.str).array;
+	}
 
 final class FileCacheList{
 	string dir;
@@ -134,7 +173,7 @@ final class FileCacheList{
 				}
 		}catch(Exception e){
 			writefln("No %s file found, or inaccessable.", exeConfig.cacheFileName); 
-		}
+			}
 		return results;
 		}
 
@@ -158,7 +197,64 @@ struct GlobalConfiguration{
 	ModeStringConfig[string] modeStrings;
 	
 	// [Options]
-	bool automaticallyAddOutputExtension=true;  /// main for linux, main.exe for windows
+	bool automaticallyAddOutputExtension = true;  /// leaves it as 'main' for linux, changes to 'main.exe' for windows.
+	// do we need this with various profiles setting output file name?
+	}
+
+/// TODO: Confirm all dir paths always end with a slash so we don't have any accidental combinations
+/// where we have to add the slash to add the filename on the end.
+struct FilePath{
+	string filename; 		/// myfile.exe
+	string extension; 		/// .exe
+	string basename;		/// myfile
+	string reldir;			///	./bin/
+	string absdir;			/// C:/git/taco/bin/
+	string relpathAndName; 	/// ./bin/myfile.exe
+	string fullPathAndName;	/// C:/git/taco/bin/myfile.exe
+
+	this(string _fullPathAndName){ // how do we handle if we gave it a directory? These are all FILES right?
+		fullPathAndName = _fullPathAndName;		
+		computeData();
+		}
+
+	void computeData(){
+		import std.string;
+		alias fp = fullPathAndName;
+		// what if we have multiple dots or dots in the directory names?! We need the LAST one.
+		// and it has to occur _after_ any slashes. [also slashes must be OS specific]
+		// need either nested slashes function or regex
+
+		string delimeter = "ERROR";
+		version(Windows){delimeter = "\\";}
+		version(Linux){delimeter = "/";}
+		assert(delimeter != "ERROR");
+
+		// what if we have NO SLASHES. just a raw name? (well then it's not absolute)
+//		if(!fp.isAny("\\")){
+		if(fp.isAnyAfter(".", "\\")){
+			auto idx = fp.lastIndexOf(".");
+			if(idx != -1){
+				extension = fp[idx+1..$]; // filename.d -> 'd'
+
+				auto j = fp.lastIndexOf("\\");
+				if(j != -1){ // filename.d -> 'filename'
+					basename = fp[j+1..idx];  
+					absdir = fp[0..j];
+					}else{
+					basename = fp[0..idx];
+					absdir = "";
+					}
+
+				long i = fp.lastIndexOf("\\");
+				filename = format("%s.%s", basename, extension); // 'filename.d'
+				}else{
+				}
+			writefln("FilePath() - string [%32s] basename[%12s], extension[%3s] filename[%14s] absdir[%s]", fp, basename, extension, filename, absdir);
+			}else{
+			extension = "";
+			writefln("FilePath() - No file extension found for string [%s]", fp);
+			}
+		}
 	}
 
 struct TargetConfiguration{ // windows, linux, etc
@@ -176,14 +272,13 @@ struct TargetConfiguration{ // windows, linux, etc
 
 	// enumerated data
 	string[] sourceFilesFound;
-	//string[] sourceFilesFoundPlusPath;
-	//string[] sourceFilesFoundPlusIntermediatePath;
+	FilePath[] sourceFilesFound2;
 	}
 
-struct ProfileConfiguration{ 
-	string mode; /// full mode string ala "-d -debug -o"
+struct ProfileConfiguration{ /// "release", "debug", special stuff like "scanme" (a user script)
+	string mode; /// full mode string ala "-d -debug -o" should this be normal pieces?
+	string[] modesEnabled;
 	string outputFilename = "main"; // automatically adds .exe
-
 	}
 
 ProfileConfiguration[string] runToml(){
@@ -210,9 +305,8 @@ ProfileConfiguration[string] runToml(){
     	const char[] wrapInException = format("
 			{
 				try{
-				
-					foreach(string __path; dirEntries(FIXME ~ %s, \"*.d\", SpanMode.shallow.shallow)){   
-					filesList ~= __path;
+					// how do we put our own code in here without quotation marks? A run a delegate?
+					%s
 					}
 				}catch(Exception e){
 					writeln(\"Exception occured: \", e);
@@ -222,12 +316,6 @@ ProfileConfiguration[string] runToml(){
 	verboseWriteln();
 
 	globalConfig.automaticallyAddOutputExtension = doc["options"]["automaticallyAddOutputExtension"].boolean;
-
-	string[] convTOMLtoArray(TOMLValue t){ 
-		import std.algorithm : map;
-		import std.array : array;
-		return t.array.map!((o) => o.str).array;
-		}
 
 	string[] compilerNames = convTOMLtoArray(doc["project"]["compilers"]);
 	foreach(m, n; doc["modeStrings"]){
@@ -260,8 +348,7 @@ ProfileConfiguration[string] runToml(){
 					foreach(string __path; dirEntries(path, "*.d", SpanMode.shallow)){   
 						verboseWriteln("\t", __path);
 						tc.sourceFilesFound ~= __path;
-						//tc.sourceFilesFoundPlusPath ~= __path;
-						//tc.sourceFilesFoundPlusIntermediatePath ~= __path;
+						tc.sourceFilesFound2 ~= FilePath(__path);
 						}
 				}catch(Exception e){
 					writeln("Exception occured: ", e);
@@ -280,6 +367,7 @@ ProfileConfiguration[string] runToml(){
 		verboseWriteln("\t", buildProfileData);
 		ProfileConfiguration pc;
 		auto modeArray = buildProfileData["modesEnabled"].array; // selected modes for configuration
+		pc.modesEnabled = convTOMLtoArray(buildProfileData["modesEnabled"]);
 		string temp;
 		string currentCompiler = "dmd"; // TODO FIXME.  compilerNames[i]?
 		foreach(i, m; modeArray){
@@ -317,7 +405,7 @@ struct ExeConfigType{
 	bool doCachedCompile = true;
 	bool doRunCompiler = false;
 	bool didCompileSucceed = false;
-	bool doPrintVerbose = false; /// for error troubleshooting
+	bool doPrintVerbose = true; /// for error troubleshooting
 	string modeSet="default"; // todo: change to enum or whatever. /// This is the builder mode state variable! NOT a "mode"/profile/etc. 'default' to start.
 	
 	string selectedProfile = "release";
@@ -381,8 +469,6 @@ int parseModeInit(string arg){
 	terminateEarlyString(arg);	
 	return -1;
 	}
-
-bool isAny(string t, string v){ import std.string : indexOfAny; return (t.indexOfAny(v) != -1); } /// Is any string V in T? return: boolean
 
 int parseModeBuild(string arg){
 	import std.string : indexOfAny, toLower;
@@ -465,20 +551,30 @@ void commandBuild(){
 	ProfileConfiguration[string]  pConfigs = runToml();
 	writeln(pConfigs);
     string filesList = "";
+    string filesObjList = "";
+
+	auto targetOS = exeConfig.selectedTargetOS;
+	auto profile = exeConfig.selectedProfile;
+	auto compiler = exeConfig.selectedCompiler;
 
 	writeln("");
 	displayQuote();
 	writeln("");
-    writeln("Files to compile [", exeConfig.selectedTargetOS,"]");
+    writeln("Files to compile [", targetOS,"]");
 	foreach(t; tConfigs){
 		writeln(t.sourceFilesFound);
 	}
-	foreach(file; tConfigs[exeConfig.selectedTargetOS].sourceFilesFound){
-		filesList ~= file ~ " ";
+	foreach(file; tConfigs[targetOS].sourceFilesFound2){
+		import std.string : replace;
+		filesList ~= file.fullPathAndName ~ " "; //file ~ " ";
+		filesObjList ~= tConfigs[targetOS].intermediatePath ~ file.filename.replace(".d",".obj") ~ " "; //file ~ " ";
+		//FilePath f = FilePath(file);
 		}
-	writefln("\"%s\"\n", filesList);
+	writeln("filesObjList - ", filesObjList);
 
-	auto fcl = new FileCacheList(tConfigs[exeConfig.selectedTargetOS].sourceFilesFound);
+	writefln("Files List \"%s\"\n", filesList);
+
+	auto fcl = new FileCacheList(tConfigs[targetOS].sourceFilesFound);
 	string[] changedFiles = fcl.getDifferences();
 	writeln("Changed files detected:");
 	foreach(f; changedFiles){
@@ -487,27 +583,26 @@ void commandBuild(){
 	writeln();
     writeln("Library paths:");
 	string libPathList = "";
-	foreach(libpath; tConfigs[exeConfig.selectedTargetOS].libPaths){
-		switch(tConfigs[exeConfig.selectedTargetOS].target){
+	foreach(libpath; tConfigs[targetOS].libPaths){
+		switch(tConfigs[targetOS].target){
 			case("linux"):   libPathList ~= "-L-L"~libpath~" "; 		break;
 			case("windows"): libPathList ~= "-L/LIBPATH:"~libpath~" ";	break;
 			case("macosx") : assert(0, "macosx not tested");
-			default:		 assert(0, format("invalid target name [%s]", exeConfig.selectedProfile)); break;
+			default:		 assert(0, format("invalid target name [%s]", profile)); break;
 			}
 		}
 	writefln("\t\"%s\"", libPathList);
 
 	writeln("");
-	writefln("Buildname: %s (%s/%s)",	exeConfig.selectedProfile,
-			exeConfig.selectedTargetOS, exeConfig.selectedCompiler);
+	writefln("Buildname: %s (%s/%s)", profile, targetOS, compiler);
 	writeln("");
 
-    immutable string flags = pConfigs[exeConfig.selectedProfile].mode;
+    immutable string flags = pConfigs[profile].mode;
 	string runString;
 	bool doCachedCompile=true;
 	if(!doCachedCompile){
 		runString =
-			"dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ 
+			"dmd -of=" ~ pConfigs[profile].outputFilename ~ 
 		  	" " ~ flags ~ " " ~	filesList ~ " " ~ libPathList ~ " " ~ 
 			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags;
 		
@@ -516,7 +611,7 @@ void commandBuild(){
 		if (dmd.status != 0){
 			writeln("Compilation failed:\n", dmd.output);
 			}else{
-			writefln("Writing to [%s]", pConfigs[exeConfig.selectedProfile].outputFilename);
+			writefln("Writing to [%s]", pConfigs[profile].outputFilename);
 			writeln("Compilation succeeded:\n\n", dmd.output);
 			writeln();
 			exeConfig.didCompileSucceed = true;
@@ -596,7 +691,7 @@ void commandBuild(){
 		// then if they all succeed, compile the final product.
 		import std.string : replace;
 		runString = "dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ 
-		  	" " ~ flags ~ " " ~	filesList.replace(".d",".obj").replace(tConfigs[exeConfig.selectedTargetOS].sourcePaths[0],
+		  	" " ~ flags ~ " " ~	filesObjList.replace(tConfigs[exeConfig.selectedTargetOS].sourcePaths[0],
 							tConfigs[exeConfig.selectedTargetOS].intermediatePath) ~ " " ~ libPathList ~ " " ~ 
 			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags; // FIX ME^^^^
 			// we need to remove the path part (which is combined into a filename+path currently)

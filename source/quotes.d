@@ -12,6 +12,6 @@ string[] quoteStrings = [
     "Aid me, Master Builder, in all the things that I must do. Guide me, Master Builder, and for all my days I'll serve you true.",
     "Lay stone upon stone, pile foe upon foe, ‘til thy Builder's work is done.",
     ];
-string[] successQuotes = [];
-string[] failQuotes = [    
-    ];
+/// If we decide to do one type of quote for success or fail.
+//string[] successQuotes = [];
+//string[] failQuotes = [];

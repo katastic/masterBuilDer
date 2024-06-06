@@ -14,9 +14,7 @@ bool isAny(string src, string match){ return (src.indexOfAny(match) != -1); } //
   
 /// Is there any string src in match after AfterThis matches? return: boolean. false if either condition fails
 bool isAnyAfter(string src, string match, string afterThis){
-	if (src.indexOfAny(afterThis) != -1)
-		return (src.indexOfAny(match) != -1);
-	return false;
+	return (src.indexOfAny(afterThis) != -1) && (src.indexOfAny(match) != -1);
 	}
 
 string[] convTOMLtoArray(TOMLValue t){ 
@@ -176,11 +174,11 @@ struct FilePath{
 					absdir = "";
 					}
 
-				long i = fp.lastIndexOf("\\");
 				filename = format("%s.%s", basename, extension); // 'filename.d'
 				}else{
 				}
-			writefln("FilePath() - string [%32s] basename[%12s], extension[%3s] filename[%14s] absdir[%s]", fp, basename, extension, filename, absdir);
+			writefln("FilePath() - string [%32s] basename[%12s], extension[%3s] filename[%14s] absdir[%s]",
+				 fp, basename, extension, filename, absdir);
 			}else{
 			extension = "";
 			writefln("FilePath() - No file extension found for string [%s]", fp);
@@ -539,7 +537,16 @@ void commandBuild(){
 		if(exeConfig.doParallelCachedCompile == false){
 			writeln(" - single threaded");
 			foreach(file; changedFiles){
-				string execString = format("dmd -c -I/src/ -od=/temp/ %s %s", file, libPathList);
+
+			string includePathsStr;
+			foreach(p; tConfigs[targetOS].includePaths)
+				includePathsStr ~= format("-I%s ", p);
+
+				string execString = format("dmd -c %s -od=%s %s %s", 
+					includePathsStr, 
+					tConfigs[targetOS].intermediatePath,
+					file,
+					libPathList); //-od doesn't seem to even do anything
 				
 				if(exeConfig.doRunCompiler){
 					writeln("trying to execute:\n\t", execString);
@@ -565,10 +572,13 @@ void commandBuild(){
 		// we might want to store each ones stdout/stderr and display them sequentually so there's no
 		// stdout race conditions, and also only display stderr of those that fail.
 
-		foreach(file; changedFiles){
-			FilePath filepath = FilePath(file);
+		try{
+
+			// does taskpool simply explode on being used on a associated array?
+		//foreach(ref file; changedFiles){
+		foreach(immutable file; taskPool.parallel(changedFiles)){
+			immutable FilePath filepath = FilePath(file);
 			string fileStr = tConfigs[targetOS].intermediatePath ~ filepath.basename ~ ".obj";
-		//foreach(file; taskPool.parallel(changedFiles, 1)){
 			string includePathsStr;
 			foreach(p; tConfigs[targetOS].includePaths)
 				includePathsStr ~= format("-I%s ", p);
@@ -578,15 +588,13 @@ void commandBuild(){
 				tConfigs[targetOS].intermediatePath,
 				file,
 				libPathList, fileStr); 
-				// file.replace(".d", ".obj").replace(tConfigs[targetOS].sourcePaths[0], tConfigs[targetOS].intermediatePath)
-							 // FIXME, only one path. How do we deal with multiple src paths?
-			
+							
 			if(exeConfig.doRunCompiler){
 				writeln("trying to execute:\n\t", execString);
 				auto exec = executeShell(execString);				
 				if(exec.status != 0){
 						writefln("Compilation of %s failed:\n%s", file, exec.output);
-						if(stopOnFirstError)break;
+						//if(stopOnFirstError)break; // can't do breaks in parallel foreach
 						}else{
 						writefln("Compilation of %s succeeded.\n", file);
 						}
@@ -594,8 +602,14 @@ void commandBuild(){
 					writeln("Would have tried to execute (file to obj):\n\t", execString);
 					}
 				}
-			if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
+			}catch(Exception e){
+			writeln(e);
+			assert(false);
 			}
+
+		if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
+		}
+		
 		// then if they all succeed, compile the final product.
 		runString = "dmd -of=" ~ pConfigs[profile].outputFilename ~ 
 		  	" " ~ flags ~ " " ~	
@@ -620,9 +634,10 @@ void commandBuild(){
 		}
 	}
 
-GlobalConfiguration globalConfig;
-TargetConfiguration[string] tConfigs;
-ExeConfigType exeConfig;
+// __gshared because taskpool.parallel is too stupid to have access to these with TLS.
+__gshared GlobalConfiguration globalConfig;
+__gshared TargetConfiguration[string] tConfigs;
+__gshared ExeConfigType exeConfig;
 
 void setupDefaultOSstring(){
 	exeConfig.selectedTargetOS = "excuse me, wat"; // default fail case.

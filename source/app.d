@@ -4,6 +4,9 @@
 		- we can COLORIZE output with ascii codes. [can we detect a proper terminal on windows?]
 			- highlight output path only, in the output string. or other important info
 
+			- not sure how 'try' would work with intermediates. it would still have to make the intermediates just not the final build.
+				- also not sure it's even needed once the code works. It's basically just "build + debug logs"
+
 		- still not properly dumping to temp directory (partially related to next point)
 			- how do we handle multiple sourcepaths? 1 temp path for each source.
 				- HOWEVER, what about recursive?
@@ -72,6 +75,8 @@ module app;
 import std.process, std.path, std.stdio;
 import std.digest.crc, std.format, std.file;
 import toml;
+import std.parallelism;
+import std.string;
 
 alias fileHashes = string[string];
 
@@ -291,14 +296,10 @@ ProfileConfiguration[string] runToml(){
 	doc = parseTOML(cast(string)read(exeConfig.buildScriptFileName));
 	
 	auto compilers = doc["project"]["compilers"].array;
-	foreach(c; compilers){
-		verboseWriteln("compilers found: ", c);
-		}
+	foreach(c; compilers)verboseWriteln("compilers found: ", c);
 	
 	auto targets = doc["project"]["targets"].array;
-	foreach(t; targets){
-		verboseWriteln("targets found: ", t);
-		}
+	foreach(t; targets)verboseWriteln("targets found: ", t);
 
 	template wrapInException(string path){ //fixme bad name. Also. Not used anymore???
 		import std.format;		
@@ -362,7 +363,6 @@ ProfileConfiguration[string] runToml(){
 	foreach(mode; doc["project"]["profiles"].array){
 		string name = mode.str;
 		verboseWritefln("Reading profile: ", name); // "debug", "release", etc
-		
 		auto buildProfileData = doc[mode.str];
 		verboseWriteln("\t", buildProfileData);
 		ProfileConfiguration pc;
@@ -538,9 +538,7 @@ void parseCommandline(string[] myArgs){
 			else if(exeConfig.modeSet=="helper"){displayHelp();}
 			else if(exeConfig.modeSet=="quote"){displayQuote();}
 		}
-	if(exeConfig.modeSet == "build"){
-		commandBuild();
-		}
+	if(exeConfig.modeSet == "build")commandBuild();
 	return;
 	}
 
@@ -552,18 +550,14 @@ void commandBuild(){
 	writeln(pConfigs);
     string filesList = "";
     string filesObjList = "";
-
 	auto targetOS = exeConfig.selectedTargetOS;
 	auto profile = exeConfig.selectedProfile;
 	auto compiler = exeConfig.selectedCompiler;
-
 	writeln("");
 	displayQuote();
 	writeln("");
     writeln("Files to compile [", targetOS,"]");
-	foreach(t; tConfigs){
-		writeln(t.sourceFilesFound);
-	}
+	foreach(t; tConfigs)writeln(t.sourceFilesFound);
 	foreach(file; tConfigs[targetOS].sourceFilesFound2){
 		import std.string : replace;
 		filesList ~= file.fullPathAndName ~ " "; //file ~ " ";
@@ -571,15 +565,11 @@ void commandBuild(){
 		//FilePath f = FilePath(file);
 		}
 	writeln("filesObjList - ", filesObjList);
-
 	writefln("Files List \"%s\"\n", filesList);
-
 	auto fcl = new FileCacheList(tConfigs[targetOS].sourceFilesFound);
 	string[] changedFiles = fcl.getDifferences();
 	writeln("Changed files detected:");
-	foreach(f; changedFiles){
-		writeln("\t", f);
-		}
+	foreach(f; changedFiles)writeln("\t", f);
 	writeln();
     writeln("Library paths:");
 	string libPathList = "";
@@ -654,48 +644,45 @@ void commandBuild(){
 
 		// we might want to store each ones stdout/stderr and display them sequentually so there's no
 		// stdout race conditions, and also only display stderr of those that fail.
-		import std.parallelism;
 
-		//foreach(file; taskPool.parallel(changedFiles, 1)){
 		foreach(file; changedFiles){
+			FilePath filepath = FilePath(file);
+			string fileStr = tConfigs[targetOS].intermediatePath ~ filepath.basename ~ ".obj";
+		//foreach(file; taskPool.parallel(changedFiles, 1)){
 			string includePathsStr;
-			foreach(p; tConfigs[exeConfig.selectedTargetOS].includePaths){
+			foreach(p; tConfigs[targetOS].includePaths)
 				includePathsStr ~= format("-I%s ", p);
-				}
-			import std.string;
+
 			string execString = format("dmd -c %s -od=%s %s %s -of=%s",   // does -od even work??
 				includePathsStr,
-				tConfigs[exeConfig.selectedTargetOS].intermediatePath,
+				tConfigs[targetOS].intermediatePath,
 				file,
-				libPathList, file
-					.replace(".d", ".obj")
-					.replace(tConfigs[exeConfig.selectedTargetOS].sourcePaths[0],
-							tConfigs[exeConfig.selectedTargetOS].intermediatePath)); 
+				libPathList, fileStr); 
+				// file.replace(".d", ".obj").replace(tConfigs[targetOS].sourcePaths[0], tConfigs[targetOS].intermediatePath)
 							 // FIXME, only one path. How do we deal with multiple src paths?
 			
 			if(exeConfig.doRunCompiler){
 				writeln("trying to execute:\n\t", execString);
 				auto exec = executeShell(execString);				
 				if(exec.status != 0){
-					writefln("Compilation of %s failed:\n%s", file, exec.output);
-					if(stopOnFirstError)break;
+						writefln("Compilation of %s failed:\n%s", file, exec.output);
+						if(stopOnFirstError)break;
+						}else{
+						writefln("Compilation of %s succeeded.\n", file);
+						}
 					}else{
-					writefln("Compilation of %s succeeded.\n", file);
+					writeln("Would have tried to execute (file to obj):\n\t", execString);
 					}
-				}else{
-				writeln("Would have tried to execute (file to obj):\n\t", execString);
 				}
-			}
 			if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
-		}
+			}
 		// then if they all succeed, compile the final product.
-		import std.string : replace;
-		runString = "dmd -of=" ~ pConfigs[exeConfig.selectedProfile].outputFilename ~ 
-		  	" " ~ flags ~ " " ~	filesObjList.replace(tConfigs[exeConfig.selectedTargetOS].sourcePaths[0],
-							tConfigs[exeConfig.selectedTargetOS].intermediatePath) ~ " " ~ libPathList ~ " " ~ 
-			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags; // FIX ME^^^^
-			// we need to remove the path part (which is combined into a filename+path currently)
-			// and substitute our own intermediate path
+		runString = "dmd -of=" ~ pConfigs[profile].outputFilename ~ 
+		  	" " ~ flags ~ " " ~	
+			filesObjList.replace(
+					tConfigs[targetOS].sourcePaths[0],
+					tConfigs[targetOS].intermediatePath) ~ " " ~ 
+			libPathList ~ " " ~ exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags;
 
 		if(!exeConfig.doRunCompiler){
 			writeln();

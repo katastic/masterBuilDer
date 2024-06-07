@@ -12,9 +12,9 @@
     recursiveSourcePaths = [ ]
     libPaths = [
         '.',
-        'C:\git\dlawn\winbuilddeps\lib\', 
-        'C:\git\dlawn\winbuilddeps\dallegro5\', 
-        'C:\git\dlawn\toml\',
+        'C:\git\dlawn\winbuilddeps\lib\',  # allegro.lib
+        'C:\git\dlawn\winbuilddeps\dallegro5\', # dallegro5dmd.lib
+        'C:\git\dlawn\toml\', # toml.lib
         'C:\git\dlawn\src\'] 
     recursiveLibPaths = []
     libs = [ "toml" ]
@@ -59,10 +59,11 @@
     warnDepreciated = ["-dw", ""]
     errorDepreciated = ["-de", ""]
     noObjectIntermediates = ["-o-", ""] 
+    dip1000 = ["-dip1000", "-dip1000"]
 
 [release]
     name = "release"
-    modesEnabled = ["optimize", "other", "ignoreDepreciated"]
+    modesEnabled = ["optimize", "other", "ignoreDepreciated", "dip1000"]
     extraCompilerFlags = "" # these won't be cross compiler. add your own [modeStrings] for those.
     extraLinkerFlags = ""
     outputFilename = "main" # auto add .exe for windows or change [automaticallyAddOutputExtension]
@@ -71,7 +72,7 @@
 
 [debug]
     name = "debug"
-    modesEnabled = ["debug", "optimize", "ignoreDepreciated"]
+    modesEnabled = ["debug", "optimize", "ignoreDepreciated", "dip1000"]
     extraCompilerFlags = "" # these won't be cross compiler. add your own [modeStrings] for those.
     extraLinkerFlags = ""
     outputFilename = "main" # auto add .exe for windows or change [automaticallyAddOutputExtension]

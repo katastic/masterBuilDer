@@ -351,6 +351,7 @@ void displayQuote(){
 void runLint(){
 	}
 
+/// Return: -1 on error
 int parseModeInit(string arg){
 	verboseWritefln("parseModeInit(%s)", arg);
 	switch(arg.strip){
@@ -365,6 +366,7 @@ int parseModeInit(string arg){
 	return -1;
 	}
 
+/// Return: -1 on error
 int parseModeBuild(string arg){
 	verboseWritefln("parseModeBuild(%s)", arg);	
 	immutable long n = arg.indexOfAny("=");

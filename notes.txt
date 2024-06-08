@@ -5,6 +5,20 @@
     - need to add the -- argument support and just dump the rest to the called program.
 
 
+
+    - script:
+        check for 
+            version(windows)    (first letter should be capital!)
+            version(linux)
+
+    - support separate unittest files because I don't give two shits what DLang thinks is acceptable (that unittests should pollute and fill up a normal D file).
+        e.g.
+            myFile.d
+            myFile.dunit
+        or (specify different unit test directory)
+            myFile.d
+            unittests\myFile.dunit
+
     - FUZZY IMPORTER
         - remove every import statement, tries to compile. If error message shows up, adds it and only the required sub-imports (up to X number, otherwise mass import). If no 
         error, it's gone. Show diff log for [Y/n] approval.

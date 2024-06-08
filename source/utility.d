@@ -11,7 +11,7 @@ import std.string : indexOfAny;
 import std.algorithm : map;
 
 alias fileHashes = string[string];
-bool *doVerboseMode;
+__gshared bool *doVerboseMode;
 
 void setVerboseModeVariable(bool *_doVerboseMode){
     doVerboseMode = _doVerboseMode;
@@ -31,7 +31,8 @@ string[] convTOMLtoArray(TOMLValue t){
 /// Only print if doPrintVerbose is true, exact replacement for writeln
 void verboseWriteln(A...)(A a){  // todo: what about fln version. Pass in a std.format is all needed?
     assert(doVerboseMode !is null);
-	if(doVerboseMode)foreach(t; a)writeln(t);
+	if(!*doVerboseMode)return;
+	foreach(t; a)writeln(t);	
 	//if(exeConfig.doPrintVerbose)foreach(t; a)writeln(t);
 	}
 
@@ -39,7 +40,7 @@ void verboseWriteln(A...)(A a){  // todo: what about fln version. Pass in a std.
 void verboseWritefln(alias fmt, A...)(A args){
     assert(doVerboseMode !is null);
     if (isSomeString!(typeof(fmt))){
-		if(doVerboseMode)return;
+		if(!*doVerboseMode)return;
         return writefln(fmt, args);
         }
     }
@@ -47,7 +48,24 @@ void verboseWritefln(alias fmt, A...)(A args){
 /// adapted from from function signatures here: https://github.com/dlang/phobos/blob/master/std/stdio.d
 void verboseWritefln(Char, A...)(in Char[] fmt, A args){
     assert(doVerboseMode !is null);
-    if(doVerboseMode)return;
+    if(!*doVerboseMode)return;
     writefln(fmt, args);
     }
 
+bool isFirstLetterDot(string name){
+	assert(name.length > 1);
+	return (name[0] == '.');
+	}
+
+import std.file : DirEntry;
+bool isHidden(DirEntry de){                             /// Because D is dumb and keeps attributes in OS specific format.			
+	version(Windows){
+		enum FILE_ATTRIBUTE_HIDDEN = 0x02;
+		return cast(bool)(de.attributes & FILE_ATTRIBUTE_HIDDEN); //https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
+		}
+	version(Linux  ){
+		return de.isFirstLetterDot;
+		}
+	assert(0, "OS not implemented");
+	return 0;
+	}

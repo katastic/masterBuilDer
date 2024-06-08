@@ -22,7 +22,7 @@ final class FileCacheList{
 		tempFiles = filenames;
 		differencesDb = compareAndFindDifferences();
 		if(differencesDb.length > 0){
-			writeln("Found differences:", differencesDb);
+			verboseWriteln("Found differences:", differencesDb);
 			foundDifferences = true;
 			}
 		}
@@ -36,22 +36,22 @@ final class FileCacheList{
 		database = currentValues; // NOTE: SIDE-EFFECT. Calling this updates our perception of database.
 		fileHashes differences;
 
-		foreach(k,v; oldValues){    writefln("old    %s %s", k, v);}
-		foreach(k,v; currentValues){writefln("cached %s %s", k, v);}
+		foreach(k,v; oldValues){    verboseWritefln("old    %s %s", k, v);}
+		foreach(k,v; currentValues){verboseWritefln("cached %s %s", k, v);}
 
 		// what if a file is REMOVED??
 		verboseWriteln("compareAndFindDifferences() - DIFFERENCES");
 		foreach(k, v; currentValues){
 			if(k !in oldValues){
-				writefln("\t%30s - %s [NEW]", k, v);
+				verboseWritefln("\t%30s - %s [NEW]", k, v);
 				differences[k] = v;
 				continue;
 				}
 			if(currentValues[k] != oldValues[k]){				
-				writefln("\t%30s - %s vs %s [DIFF]", k, v, oldValues[k]);
+				verboseWritefln("\t%30s - %s vs %s [DIFF]", k, v, oldValues[k]);
 				differences[k] = v;
 				} else {
-				writefln("\t%30s - %s vs %s [MATCH]", k, v, currentValues[k]);
+				verboseWritefln("\t%30s - %s vs %s [MATCH]", k, v, currentValues[k]);
 				}
 			}
 
@@ -72,10 +72,10 @@ final class FileCacheList{
 		auto file = File(exeConfig.cacheFileName, "w");
 		file.writeln("[fileHashes]");
 
-		writeln("OUTPUT TO FILE--> ", exeConfig.cacheFileName);
+		verboseWriteln("OUTPUT TO FILE--> ", exeConfig.cacheFileName);
 		foreach(f, hex; db){
 			//string hex = toHexString!(LetterCase.lower)(digest!CRC32(readText(f))).dup;
-			writefln("\t%30s - %s", f, hex);
+			verboseWritefln("\t%30s - %s", f, hex);
 			file.writefln("\"%s\" = \"%s\"", f, hex);
 			database[f] = hex;
 			}
@@ -86,9 +86,9 @@ final class FileCacheList{
 		fileHashes results;
 		try{
 			TOMLDocument doc = parseTOML(cast(string)read(exeConfig.cacheFileName));
-			writeln("scanCachedHashes() - ", exeConfig.cacheFileName);
+			verboseWriteln("scanCachedHashes() - ", exeConfig.cacheFileName);
 			foreach(f, hex; doc["fileHashes"]){
-				writefln("\t%30s - %s", f, hex.str);
+				verboseWritefln("\t%30s - %s", f, hex.str);
 				results[f] = hex.str;
 				}
 		}catch(Exception e){
@@ -99,10 +99,10 @@ final class FileCacheList{
 
 	fileHashes scanHashes(string[] files){
 		fileHashes results;
-		writeln("scanHashes() - FileCacheList:");
+		verboseWriteln("scanHashes() - FileCacheList:");
 		foreach(f; files){
 			string hex = toHexString!(LetterCase.lower)(digest!CRC32(readText(f))).dup;
-			writefln("\t%30s - %s", f, hex);
+			verboseWritefln("\t%30s - %s", f, hex);
 			results[f] = hex;
 			}
 		return results;
@@ -136,6 +136,11 @@ struct FilePath{
 		fullPathAndName = _fullPathAndName;		
 		computeData();
 		}
+	
+	this(DirEntry d){
+		fullPathAndName = d.name;
+		computeData();
+		}
 
 	void computeData(){
 		alias fp = fullPathAndName;
@@ -167,7 +172,7 @@ struct FilePath{
 				filename = format("%s.%s", basename, extension); // 'filename.d'
 				}else{
 				}
-			writefln("FilePath() - string [%32s] basename[%12s], extension[%3s] filename[%14s] absdir[%s]",
+			verboseWritefln("FilePath() - string [%32s] basename[%12s], extension[%3s] filename[%14s] absdir[%s]",
 				 fp, basename, extension, filename, absdir);
 			}else{
 			extension = "";
@@ -231,7 +236,7 @@ ProfileConfiguration[string] runToml(){
 
 	string[] compilerNames = convTOMLtoArray(doc["project"]["compilers"]);
 	foreach(m, n; doc["modeStrings"]){
-		verboseWriteln("[",m, "] = ", n[0], "/", n[1], " of type ", n.type); // string
+		verboseWriteln("[",m, "] = ", n[0], "/", n[1], " of type ", n.type); // string. note: hardcoded with number of compilers
 		ModeStringConfig _modeString;
 		foreach(i, t; n.array){_modeString.modePerCompiler[compilerNames[i]] ~= t.str;}
 		globalConfig.modeStrings[m] = _modeString;
@@ -257,17 +262,18 @@ ProfileConfiguration[string] runToml(){
 		foreach(path; tc.sourcePaths){
 				verboseWritefln("try scanning path %s for target %s", path, tc.target);
 				try{				
-					foreach(string __path; dirEntries(path, "*.d", SpanMode.shallow)){   
-						verboseWriteln("\t", __path);
-						tc.sourceFilesFound ~= __path;
-						tc.sourceFilesFound2 ~= FilePath(__path);
+					foreach(DirEntry de; dirEntries(path, "*.d", SpanMode.shallow)){
+						if(de.isHidden)
+						verboseWriteln("\t", de);
+						tc.sourceFilesFound ~= de.name;
+						tc.sourceFilesFound2 ~= FilePath(de);
 						}
 				}catch(Exception e){
 					writeln("Exception occured: ", e);
 				}
 			}
-		tConfigs[t.str] = tc;
-		verboseWriteln("Source files found: ", tc.sourceFilesFound);
+		tConfigs[t.str] = tc;		
+		verboseWriteln("Source files found: ", tc.sourceFilesFound2.map!"a.filename");
 		}
 	
 	ProfileConfiguration[string] pConfigs;
@@ -294,24 +300,24 @@ ProfileConfiguration[string] runToml(){
 	}
 
 struct ExeConfigType{
-	bool forwardRemainingArguments = false;
-	string forwardArguments = "";
+	bool forwardRemainingArguments 	= false;
+	string forwardArguments 		= "";
 
-	bool doParallelCachedCompile = true;
-	bool doCachedCompile = true;
-	bool doRunCompiler = false;
-	bool didCompileSucceed = false;
-	bool doPrintVerbose = true; /// for error troubleshooting
-	string modeSet="default"; // todo: change to enum or whatever. /// This is the builder mode state variable! NOT a "mode"/profile/etc. 'default' to start.
+	bool doPrintVerbose 			= false; /// for error troubleshooting
+	bool doParallelCompile	  		= true;
+	bool doCachedCompile 			= true;
+	bool doRunCompiler 				= false;
+	bool didCompileSucceed 			= false;
+	string modeSet					="default"; // todo: change to enum or whatever. /// This is the builder mode state variable! NOT a "mode"/profile/etc. 'default' to start.
 	
-	string selectedProfile = "release";
+	string selectedProfile 	= "release";
 	string selectedCompiler = "dmd";
 	string selectedTargetOS = "windows";  // set by version statement in main.
 
-	string buildScriptFileName = "buildConfig.toml"; /// Unless overriden with option TODO
-	string cacheFileName = "buildFileCache.toml"; // should this be in the buildConfig?
-	string extraCompilerFlags = "";
-	string extraLinkerFlags = "";
+	string buildScriptFileName 	= "buildConfig.toml"; /// Unless overriden with option TODO
+	string cacheFileName 		= "buildFileCache.toml"; // should this be in the buildConfig?
+	string extraCompilerFlags 	= "";
+	string extraLinkerFlags 	= "";
 	}
 
 void displayHelp(){
@@ -345,7 +351,9 @@ void displayHelp(){
 
 void displayQuote(){
 	import quotes, std.random;
+	writeln();
 	writefln("\"%s\"", quoteStrings[ uniform!"[]"(0, cast(int)quoteStrings.length-1)] );
+	writeln();
 	}
 
 void runLint(){
@@ -372,18 +380,33 @@ int parseModeBuild(string arg){
 	immutable long n = arg.indexOfAny("=");
 
 	if(arg == "--"){
-		writefln("Forward argument mode detected!");
+		verboseWritefln("Forward argument mode detected!");
 		exeConfig.forwardRemainingArguments = true;
 		return 0;
 		}
 
 	if(n == -1){writeln("Error. Option missing equals?"); terminateEarlyString(arg); return -1;} // args must be in key=value, so if there's no equal it's invalid.
 	verboseWritefln("matching [%s] = [%s]", arg[0..n], arg[n+1..$]);
-	immutable string option=arg[0..n];
-	immutable string value=arg[n+1..$];
+	immutable string option = arg[0..n];
+	immutable string value  = arg[n+1..$].strip;
 	// note we ONLY change case of option! We don't want to
 	//  accidentally change case of a compiler flag string!
 	switch(option.toLower){
+		case "parallel":
+			verboseWritefln("Setting parallel=%s", value.toLower);
+			auto val = value.toLower;
+			if     (val == "true"  || val == "yes" || val == "on" ){writeln(" * Parallel mode on"); exeConfig.doParallelCompile = true; return 0;}
+			else if(val == "false" || val == "no"  || val == "off"){writeln(" * Parallel mode off"); exeConfig.doParallelCompile = false; return 0;}
+			else { writefln("Unrecognized option: [%s]", val);}
+			return -1;
+		break;		case "verbose":
+			verboseWritefln("Setting verbose=%s", value.toLower);
+			auto val = value.toLower;
+			if     (val == "true"  || val == "yes" || val == "on" ){writeln(" * Verbose mode on"); exeConfig.doPrintVerbose = true; return 0;}
+			else if(val == "false" || val == "no"  || val == "off"){writeln(" * Verbose mode off"); exeConfig.doPrintVerbose = false; return 0;}
+			else { writefln("Unrecognized option: [%s]", val);}
+			return -1;
+		break;
 		case "profile":
 			verboseWriteln("Setting profile=", value.toLower);
 			exeConfig.selectedProfile = value.toLower;
@@ -439,16 +462,20 @@ void terminateEarlyString(string arg){
 
 void parseCommandline(string[] myArgs){
 	verboseWriteln("args:", myArgs);
-	foreach(arg; myArgs){
-			if(exeConfig.forwardRemainingArguments){setForwardArguments(arg);}
-			else{
-				if(exeConfig.modeSet=="default"){if(parseModeInit(arg)){return;}}
-				else if(exeConfig.modeSet=="build"){if(parseModeBuild(arg)){return;}}
-				else if(exeConfig.modeSet=="helper"){displayHelp();}
-				else if(exeConfig.modeSet=="quote"){displayQuote();}
+	with(exeConfig){
+		foreach(arg; myArgs){
+				if(forwardRemainingArguments){setForwardArguments(arg);}
+				else{
+					if(modeSet=="default"){if(parseModeInit(arg)){return;}}
+					else if(modeSet=="build" || modeSet=="go"){if(parseModeBuild(arg)){return;}}
+					else if(modeSet=="helper"){displayHelp();}
+					else if(modeSet=="quote"){displayQuote();}
+					else if(modeSet=="run"){commandRun();}
+				}
 			}
+		if(modeSet == "build" || modeSet == "go")commandBuild();
+		if(modeSet == "go" && didCompileSucceed)commandRun(); // "go" = build and run
 		}
-	if(exeConfig.modeSet == "build")commandBuild();
 	return;
 	}
 
@@ -463,29 +490,29 @@ void commandClean(){
 
 void commandBuild(){
 	ProfileConfiguration[string]  pConfigs = runToml();
-	writeln(pConfigs);
+	verboseWriteln(pConfigs);
     string filesList = "";
     string filesObjList = "";
 	auto targetOS = exeConfig.selectedTargetOS;
 	auto profile = exeConfig.selectedProfile;
 	auto compiler = exeConfig.selectedCompiler;
-	writeln("");
+	verboseWriteln("");
 	displayQuote();
-	writeln("");
-    writeln("Files to compile [", targetOS,"]");
-	foreach(t; tConfigs)writeln(t.sourceFilesFound);
+	verboseWriteln("");
+    verboseWriteln("Files to compile [", targetOS,"]");
+	foreach(t; tConfigs)verboseWriteln(t.sourceFilesFound);
 	foreach(file; tConfigs[targetOS].sourceFilesFound2){
 		filesList ~= file.fullPathAndName ~ " "; //file ~ " ";
 		filesObjList ~= tConfigs[targetOS].intermediatePath ~ file.filename.replace(".d",".obj") ~ " ";
 		}
-	writeln("filesObjList - ", filesObjList);
-	writefln("Files List \"%s\"\n", filesList);
+	verboseWriteln("filesObjList - ", filesObjList);
+	verboseWritefln("Files List \"%s\"\n", filesList);
 	auto fcl = new FileCacheList(tConfigs[targetOS].sourceFilesFound);
 	string[] changedFiles = fcl.getDifferences();
 	writeln("Changed files detected:");
 	foreach(f; changedFiles)writeln("\t", f);
 	writeln();
-    writeln("Library paths:");
+    verboseWriteln("Library paths:");
 	string libPathList = "";
 	foreach(libpath; tConfigs[targetOS].libPaths){
 		switch(tConfigs[targetOS].target){
@@ -495,9 +522,9 @@ void commandBuild(){
 			default:		 assert(0, format("invalid target name [%s]", profile)); break;
 			}
 		}
-	writefln("\t\"%s\"", libPathList);
+	verboseWritefln("\t\"%s\"", libPathList);
 
-	writeln("");
+	verboseWriteln("");
 	writefln("Buildname: %s (%s/%s)", profile, targetOS, compiler);
 	writeln("");
 
@@ -530,8 +557,8 @@ void commandBuild(){
 		
 		bool stopOnFirstError = true; /// do we stop on the first errored compile, or attempt all? exeConfig option?
 		bool hasErrorOccurred = false; 
-		if(exeConfig.doParallelCachedCompile == false){
-			writeln(" - single threaded");
+		if(exeConfig.doParallelCompile == false){
+			writeln(" - single-threaded mode:");
 			foreach(file; changedFiles){
 
 			string includePathsStr;
@@ -545,13 +572,13 @@ void commandBuild(){
 					libPathList); //-od doesn't seem to even do anything
 				
 				if(exeConfig.doRunCompiler){
-					writeln("trying to execute:\n\t", execString);
+					verboseWriteln("trying to execute:\t", execString);
 					auto exec = executeShell(execString);				
 					if(exec.status != 0){
 						writefln("Compilation of %s failed:\n%s", file, exec.output);
 						if(stopOnFirstError)break;
 						}else{
-						writefln("Compilation of %s succeeded.\n", file);
+						writefln("Compilation of %s succeeded.", file);
 						}
 					}else{
 					writeln("Would have tried to execute (file to obj):\n\n\t", execString);
@@ -560,7 +587,7 @@ void commandBuild(){
 
 			if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
 		}else{
-		writeln(" - multi threaded");
+		writeln(" - multi threaded mode");
 		// TODO ?
 		// Also, if we need a dependency graph of build order, we could figure one
 		// out either automatically (just keep compiling random ones until the order works), or allow manual.
@@ -583,13 +610,13 @@ void commandBuild(){
 				libPathList, fileStr); 
 							
 			if(exeConfig.doRunCompiler){
-				writeln("trying to execute:\n\t", execString);
+				verboseWriteln("trying to execute:\n\t", execString);
 				auto exec = executeShell(execString);				
 				if(exec.status != 0){
 						writefln("Compilation of %s failed:\n%s", file, exec.output);
 						//if(stopOnFirstError)break; // can't do breaks in parallel foreach
 						}else{
-						writefln("Compilation of %s succeeded.\n", file);
+						writefln("Compilation of %s succeeded.", file);
 						}
 					}else{
 					writeln("Would have tried to execute (file to obj):\n\t", execString);

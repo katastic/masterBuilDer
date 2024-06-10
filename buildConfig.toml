@@ -80,4 +80,24 @@
     failureOnRunScript = ""
 
 [dscanner]
-    hide = ["undocumented", "120characters" ]
+    hide = ["undocumented", "max120characters", "style"]
+# , "neverused", "nevermodified", "empty", "asserttrue", "samename", "virtualcall", "autofunc", "nonconstmethod", "underscores", "returndiscarded"
+
+[dscannerStrings] # list of strings to remove. All listed here so you don't need docs.
+    max120characters = "Line is longer than 120 characters"
+    undocumented = "undocumented"
+    neverused = "is never used"
+    nevermodified = "is never modified"
+    style = "does not match style guidelines"
+    empty = "Empty declaration"
+    asserttrue = "Assert condition is always true"
+    samename = "has the same name as a variable defined on line"
+    virtualcall = "virtual call inside a constructor"
+    functionreturn = "Function return value is discarded"
+    underscores = "Use underscores to improve number constant readability"
+    autofunc = "Auto function without return statement"
+    nonconstmethod = "Methods 'opCmp', 'toHash', 'opEquals', 'opCast', and/or 'toString' are non-const"
+    returndiscarded = "Function return value is discarded"
+    # add any more you want here, or adjust above if DScanner verbage changes.
+
+#WARN: TOML file cannot end on comment, need a final newline.

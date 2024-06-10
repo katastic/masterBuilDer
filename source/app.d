@@ -10,6 +10,7 @@ import std.algorithm : map;
 import std.array : array;
 import std.conv : to;
 
+/// Scan for files in source directories, and compare differences with stored TOML hashes.
 final class FileCacheList{	
 	import std.digest.crc;
 	string dir;
@@ -85,9 +86,9 @@ final class FileCacheList{
 	fileHashes scanCachedHashes(){
 		fileHashes results;
 		try{
-			TOMLDocument doc = parseTOML(cast(string)read(exeConfig.cacheFileName));
+			TOMLDocument doc2 = parseTOML(cast(string)read(exeConfig.cacheFileName));
 			verboseWriteln("scanCachedHashes() - ", exeConfig.cacheFileName);
-			foreach(f, hex; doc["fileHashes"]){
+			foreach(f, hex; doc2["fileHashes"]){
 				verboseWritefln("\t%30s - %s", f, hex.str);
 				results[f] = hex.str;
 				}
@@ -113,9 +114,11 @@ struct ModeStringConfig{
 	string[string] modePerCompiler; 
 	}
 
-struct GlobalConfiguration{	
+struct GlobalConfiguration{	 /// settings that apply to all profiles
 	ModeStringConfig[string] modeStrings;
-	
+	string[string] dScannerStrings;
+	string[] dScannerSelectedStrings;
+
 	// [Options]
 	bool automaticallyAddOutputExtension = true;  /// leaves it as 'main' for linux, changes to 'main.exe' for windows.
 	// do we need this with various profiles setting output file name?
@@ -181,7 +184,8 @@ struct FilePath{
 		}
 	}
 
-struct TargetConfiguration{ // windows, linux, etc
+/// Target data: windows, linux, etc
+struct TargetConfiguration{
 	string target;
 	string compilerName;
 	
@@ -205,6 +209,7 @@ struct ProfileConfiguration{ /// "release", "debug", special stuff like "scanme"
 	string outputFilename = "main"; // automatically adds .exe
 	}
 
+// Should we be separating runToml into profile vs global scans?
 ProfileConfiguration[string] runToml(){
 	import toml;
 	TOMLDocument doc;
@@ -217,6 +222,11 @@ ProfileConfiguration[string] runToml(){
 	
 	auto targets = doc["project"]["targets"].array;
 	foreach(t; targets)verboseWriteln("targets found: ", t);
+	
+	foreach(k, v; doc["dscannerStrings"]){
+		globalConfig.dScannerStrings[k] = v.str;
+		}
+	globalConfig.dScannerSelectedStrings = convTOMLtoArray(doc["dscanner"]["hide"]);
 
 	template wrapInException(string path){ //fixme bad name. Also. Not used anymore???
     	const char[] wrapInException = format("
@@ -299,6 +309,8 @@ ProfileConfiguration[string] runToml(){
 	return pConfigs;
 	}
 
+/// Try to parse a TOML doc value, and if not, dump error without interrupting other attempts.
+/// Might need a global didErrorOccur so program can at least notice them.
 void tryParse(T, U)(ref T output, U val){
 		try{
 		output = val;
@@ -307,15 +319,21 @@ void tryParse(T, U)(ref T output, U val){
 		}
 	}
 
+/// Configuration options for the executable itself such as paths to tools. Options that may not
+/// copy over from one installation to the next.
 class ExeConfigType{
+	TOMLDocument doc;
+
 	this(){
-		this("mbconfig.toml");
+		this("mbConfig.toml");
 		}
 
 	this(string filepath){
-		TOMLDocument doc;
+		// verboseWritefln("reading TOML file for exeConfig [%s]", filepath);
+		// CANT use verbosewriteln, it needs THIS setup.
 		try{
-			doc = parseTOML(cast(string)read(exeConfig.cacheFileName));
+			string data = cast(string)read(r"C:\git\masterBuilDer\mbConfig.toml");
+			doc = parseTOML(data);
 		}catch(Exception e){
 			writefln("No mbConfig file found or readable [searched for %s]. Resorting to default exe configuration.");
 		}
@@ -332,10 +350,8 @@ class ExeConfigType{
 		
 		useExternalHighlighter 	= doc["options"]["useExternalHighlighter"].boolean;
 		dscannerLoc 			= doc["externalLocations"]["dscanner"].str;
-		
 		pygmentizeLoc 			= doc["externalLocations"]["pygmentize"].str;
-
-		auto pygmentizeLoc2 			= doc["externalLocations"]["pygmentize"].str;
+		auto pygmentizeLoc2 	= doc["externalLocations"]["pygmentize"].str; // test
 		assert(pygmentizeLoc == pygmentizeLoc2);
 		}
 
@@ -364,6 +380,7 @@ class ExeConfigType{
 	string extraLinkerFlags 	= "";
 	}
 
+/// Display help prompt
 void displayHelp(){
 	writeln("");
 	writeln("  masterBuilder[.exe] [command] [option=value] [option=value] -- args");
@@ -393,6 +410,7 @@ void displayHelp(){
 	writeln("\t  - build profile named debug, run, and pass it \"hello!\" ");
 	}
 
+/// Display a quote
 void displayQuote(){
 	import quotes, std.random;
 	writeln();
@@ -400,7 +418,46 @@ void displayQuote(){
 	writeln();
 	}
 
+/// Run dscanner pass
 void runLint(){
+	import std.typecons : Yes;
+	import std.algorithm.iteration : filter, splitter;
+	import std.array : split;
+	import std.string;
+	import std.algorithm.searching : canFind;
+	import std.algorithm.iteration : each;
+	import toml;
+	// TODO	
+	runToml();
+	//TOMLDocument doc = parseTOML(cast(string)read(buildConfig.toml));
+
+	auto targetOS = exeConfig.selectedTargetOS;
+	string filesList;
+	// FIX: we need to run the PARSE TOML to get source file locations first!
+	foreach(file; tConfigs[targetOS].sourceFilesFound2){ // similar to commandBuild
+		filesList ~= file.fullPathAndName ~ " ";	
+		}
+	string runString = format("%s -S %s", exeConfig.dscannerLoc, filesList); 
+	writeln("Running:", runString);
+	auto dscan = executeShell(runString);
+	if (dscan.status != 0){
+		string[] output = dscan.output.splitter("\n").array;
+		string[] output2;
+		foreach(line; output)
+			{
+			foreach(match; globalConfig.dScannerSelectedStrings){
+				//writeln("searching for ", match);
+				// EXCEPTION if matches aren't in array, we should check in the runToml fufnction.
+				if(line.canFind(globalConfig.dScannerStrings[match]))goto end;
+				} // if we don't match anything, let the line through.
+			output2 ~= line;
+			end:
+			}
+		auto output3 = output2.join("\n");
+		writeln("dscanner lint errors:\n", output3);
+		}else{		
+		writeln("dscanner succeeded:\n", dscan.output);
+		}
 	}
 
 /// Return: -1 on error
@@ -567,7 +624,6 @@ void commandBuild(){
 			}
 		}
 	verboseWritefln("\t\"%s\"", libPathList);
-
 	verboseWriteln("");
 	writefln("Buildname: %s (%s/%s)", profile, targetOS, compiler);
 	writeln("");
@@ -703,8 +759,10 @@ __gshared GlobalConfiguration globalConfig;
 __gshared TargetConfiguration[string] tConfigs;
 __gshared ExeConfigType exeConfig;
 
-void setup(){
-	setVerboseModeVariable(&exeConfig.doPrintVerbose);
+void setup(){	
+	exeConfig = new ExeConfigType("mbConfig.toml");
+	setVerboseModeVariable(&exeConfig.doPrintVerbose); 
+	setupDefaultOSstring();
 	}
 
 void setupDefaultOSstring(){
@@ -715,7 +773,7 @@ void setupDefaultOSstring(){
 	}
 
 int main(string[] args){
-	setup(); 				
+	setup();
 	if(args.length > 1){
 		writefln("masterBuilder %s", args[1..$]);
 		parseCommandline(args[1..$]);

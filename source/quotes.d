@@ -10,7 +10,7 @@ string[] quoteStrings = [
     "Builder, guide me in my final preparations! Builder, fuel me...and smite mine enemies. Smite now this...bothersome nettle that I see again before me.",
     "Then didst the Builder lay down His Hammer, and take His Chisel to hand. Smoothed he the rough gem, and shaped it to His will. For each task hath its tool, and every tool, a task.",
     "Aid me, Master Builder, in all the things that I must do. Guide me, Master Builder, and for all my days I'll serve you true.",
-    "Lay stone upon stone, pile foe upon foe, ‘til thy Builder's work is done.",
+    "Lay stone upon stone, pile foe upon foe, 'til thy Builder's work is done.",
     ];
 /// If we decide to do one type of quote for success or fail.
 //string[] successQuotes = [];

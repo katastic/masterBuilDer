@@ -69,8 +69,6 @@
         - easiest could be something dumb: temp directory plus full normal path replicated.
             (but we gotta make all the folders)
 
-
-
             so 
                 /src/
                 /src/my/

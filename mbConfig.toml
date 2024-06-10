@@ -1,0 +1,9 @@
+# config file for your specific installation.
+# Should be able to run without this so people can .gitignore it.
+[options]
+    colorizeOutput = true
+    useExternalHighlighter = false
+
+[externalLocations] # external tool locations. If empty, not supported.
+    dscanner = ""
+    pygmentize = "" # if we don't do our own

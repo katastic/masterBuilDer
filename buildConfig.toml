@@ -78,3 +78,6 @@
     outputFilename = "main" # auto add .exe for windows or change [automaticallyAddOutputExtension]
     successOnRunScript = ""
     failureOnRunScript = ""
+
+[dscanner]
+    hide = ["undocumented", "120characters" ]

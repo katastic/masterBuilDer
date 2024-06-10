@@ -299,7 +299,51 @@ ProfileConfiguration[string] runToml(){
 	return pConfigs;
 	}
 
-struct ExeConfigType{
+void tryParse(T, U)(ref T output, U val){
+		try{
+		output = val;
+		}catch(Exception e){
+		writefln("Couldn't find or parse value [%s]", e);
+		}
+	}
+
+class ExeConfigType{
+	this(){
+		this("mbconfig.toml");
+		}
+
+	this(string filepath){
+		TOMLDocument doc;
+		try{
+			doc = parseTOML(cast(string)read(exeConfig.cacheFileName));
+		}catch(Exception e){
+			writefln("No mbConfig file found or readable [searched for %s]. Resorting to default exe configuration.");
+		}
+		if(doc !is null){
+			parseStuff(doc);
+			}else{
+			//useDefaults(); // should already be set with inits.
+			}
+		}
+
+	final void parseStuff(TOMLDocument doc){
+		tryParse(colorizeOutput, doc["options"]["colorizeOutput"].boolean);
+		//colorizeOutput 			= doc["options"]["colorizeOutput"].boolean;
+		
+		useExternalHighlighter 	= doc["options"]["useExternalHighlighter"].boolean;
+		dscannerLoc 			= doc["externalLocations"]["dscanner"].str;
+		
+		pygmentizeLoc 			= doc["externalLocations"]["pygmentize"].str;
+
+		auto pygmentizeLoc2 			= doc["externalLocations"]["pygmentize"].str;
+		assert(pygmentizeLoc == pygmentizeLoc2);
+		}
+
+	bool colorizeOutput = false;
+	bool useExternalHighlighter = false;
+	string dscannerLoc="";
+	string pygmentizeLoc="";
+
 	bool forwardRemainingArguments 	= false;
 	string forwardArguments 		= "";
 
@@ -671,11 +715,12 @@ void setupDefaultOSstring(){
 	}
 
 int main(string[] args){
-	setup();
-	writefln("masterBuilder %s", args[1..$]);
+	setup(); 				
 	if(args.length > 1){
+		writefln("masterBuilder %s", args[1..$]);
 		parseCommandline(args[1..$]);
 		}else{
+		writefln("masterBuilder");
 		displayHelp();
 		}
     return 0;

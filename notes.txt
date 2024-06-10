@@ -1,4 +1,21 @@
 [[masterBuilDer]]
+
+    - any support for array sets on commandline? We can set say, parallel=true/on/yes
+        but what about:
+
+            dscanner:skip=120characters,undocumented
+            dscanner:skip=120characters , undocumented
+                - prune whitespace, ban whitespace from names.
+                - also note the section header ability of setting [dscanner]
+                 with SECTION:OPTION=value,value2,value3
+
+            but what if we need to set a value with whitespace?
+                specialFlags="-d -taco -rTl"
+            
+            quotes will have to be manually parsed. Make sure shell won't modify quote marks, single quotes, etc. Though, if you're specifying weird, long stuff, how about just edit the CONFIG FILE?
+
+    - basic ASCII colorize.
+
     - we could add multiple stage compile for template string substitution phase built in. So if the first phase fails, it stops and reports.
     - 'mb' for short?
 

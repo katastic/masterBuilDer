@@ -1,5 +1,9 @@
 [[masterBuilDer]]
 
+    - Should we be separating runToml into profile vs global scans?
+
+    - eventually dependency graphing, and building submodules, and... maybe... reading/parsing dub files.
+
     - any support for array sets on commandline? We can set say, parallel=true/on/yes
         but what about:
 
@@ -19,7 +23,7 @@
     - we could add multiple stage compile for template string substitution phase built in. So if the first phase fails, it stops and reports.
     - 'mb' for short?
 
-    - need to add the -- argument support and just dump the rest to the called program.
+    + need to add the -- argument support and just dump the rest to the called program.
 
 
 

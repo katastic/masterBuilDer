@@ -325,17 +325,19 @@ class ExeConfigType{
 	TOMLDocument doc;
 
 	this(){
-		this("mbConfig.toml");
+		this("");
 		}
 
 	this(string filepath){
 		// verboseWritefln("reading TOML file for exeConfig [%s]", filepath);
 		// CANT use verbosewriteln, it needs THIS setup.
 		try{
-			string data = cast(string)read(r"C:\git\masterBuilDer\mbConfig.toml");
+			string newPath = filepath ~ "mbConfig.toml";
+			writeln("Using config file at", newPath);
+			string data = cast(string)read(newPath);//r"C:\git\masterBuilDer\mbConfig.toml");
 			doc = parseTOML(data);
 		}catch(Exception e){
-			writefln("No mbConfig file found or readable [searched for %s]. Resorting to default exe configuration.");
+			writefln("No mbConfig file found or readable [searched for %s]. Resorting to default exe configuration.", filepath);
 		}
 		if(doc !is null){
 			parseStuff(doc);
@@ -493,6 +495,29 @@ int parseModeBuild(string arg){
 	// note we ONLY change case of option! We don't want to
 	//  accidentally change case of a compiler flag string!
 	switch(option.toLower){
+		case "config":
+			verboseWritefln("Setting config=%s config files path", value);			
+			auto exeConfigOld = exeConfig;
+			exeConfig = new ExeConfigType(value);
+			writeln("NEW CONFIG:", exeConfig);
+			// take run-time set old values:
+			exeConfig.doRunCompiler = exeConfigOld.doRunCompiler;
+			exeConfig.modeSet = exeConfigOld.modeSet;
+			
+			// set new path
+			exeConfig.buildScriptFileName = value~"buildConfig.toml";
+			exeConfig.cacheFileName = value~"buildFileCache.toml"; // better place/way to do this? Also dir separator
+			exeConfig.doRunCompiler = true ; 
+			exeConfig.modeSet = "build";
+			return 0;
+		case "cached":
+			verboseWritefln("Setting cached=%s", value.toLower);
+			auto val = value.toLower;
+			if     (val == "true"  || val == "yes" || val == "on" ){writeln(" * Cached mode on"); exeConfig.doCachedCompile = true; return 0;}
+			else if(val == "false" || val == "no"  || val == "off"){writeln(" * Cached mode off"); exeConfig.doCachedCompile = false; return 0;}
+			else { writefln("Unrecognized option: [%s]", val);}
+			return -1;
+		break;
 		case "parallel":
 			verboseWritefln("Setting parallel=%s", value.toLower);
 			auto val = value.toLower;
@@ -500,7 +525,8 @@ int parseModeBuild(string arg){
 			else if(val == "false" || val == "no"  || val == "off"){writeln(" * Parallel mode off"); exeConfig.doParallelCompile = false; return 0;}
 			else { writefln("Unrecognized option: [%s]", val);}
 			return -1;
-		break;		case "verbose":
+		break;		
+		case "verbose":
 			verboseWritefln("Setting verbose=%s", value.toLower);
 			auto val = value.toLower;
 			if     (val == "true"  || val == "yes" || val == "on" ){writeln(" * Verbose mode on"); exeConfig.doPrintVerbose = true; return 0;}
@@ -631,10 +657,18 @@ void commandBuild(){
     immutable string flags = pConfigs[profile].mode;
 	string runString;
 	bool doCachedCompile=true;
+	
+	string fileExtension;
+	if(exeConfig.selectedTargetOS == "windows"){
+		fileExtension=".exe";
+		}else{
+		fileExtension="";
+		}
+
 	if(!doCachedCompile){
 		runString =
-			"dmd -of=" ~ pConfigs[profile].outputFilename ~ 
-		  	" " ~ flags ~ " " ~	filesList ~ " " ~ libPathList ~ " " ~ 
+			"dmd -of=" ~ pConfigs[profile].outputFilename~fileExtension ~ 
+		  	" " ~ flags ~ " " ~ 	pConfigs[exeConfig.selectedProfile].mode ~ " "~	filesList ~ " " ~ libPathList ~ " " ~ 
 			exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags;
 		
 		if(exeConfig.doRunCompiler){
@@ -642,7 +676,7 @@ void commandBuild(){
 		if (dmd.status != 0){
 			writeln("Compilation failed:\n", dmd.output);
 			}else{
-			writefln("Writing to [%s]", pConfigs[profile].outputFilename);
+			writefln("Writing to [%s]", pConfigs[profile].outputFilename~fileExtension);
 			writeln("Compilation succeeded:\n\n", dmd.output);
 			writeln();
 			exeConfig.didCompileSucceed = true;
@@ -665,9 +699,10 @@ void commandBuild(){
 			foreach(p; tConfigs[targetOS].includePaths)
 				includePathsStr ~= format("-I%s ", p);
 
-				string execString = format("dmd -c %s -od=%s %s %s", 
+				string execString = format("dmd -c %s %s -od=%s %s %s", 
 					includePathsStr, 
-					tConfigs[targetOS].intermediatePath,
+					pConfigs[exeConfig.selectedProfile].mode,
+					tConfigs[targetOS].intermediatePath,					
 					file,
 					libPathList); //-od doesn't seem to even do anything
 				
@@ -703,11 +738,13 @@ void commandBuild(){
 			foreach(p; tConfigs[targetOS].includePaths)
 				includePathsStr ~= format("-I%s ", p);
 
-			string execString = format("dmd -c %s -od=%s %s %s -of=%s",   // does -od even work??
+			string execString = format("dmd -c %s -od=%s %s %s %s -of=%s",   // does -od even work??
 				includePathsStr,
 				tConfigs[targetOS].intermediatePath,
+				pConfigs[exeConfig.selectedProfile].mode,
 				file,
-				libPathList, fileStr); 
+				libPathList, 
+				fileStr); 
 							
 			if(exeConfig.doRunCompiler){
 				verboseWriteln("trying to execute:\n\t", execString);
@@ -731,7 +768,7 @@ void commandBuild(){
 		}
 		
 		// then if they all succeed, compile the final product.
-		runString = "dmd -of=" ~ pConfigs[profile].outputFilename ~ 
+		runString = "dmd -of=" ~ pConfigs[profile].outputFilename~fileExtension ~ 
 		  	" " ~ flags ~ " " ~	
 			filesObjList.replace(
 					tConfigs[targetOS].sourcePaths[0],

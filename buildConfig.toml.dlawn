@@ -1,5 +1,5 @@
 [project]
-    name = "spaceHoleAndPiracy"
+    name = "dLawn"
     profiles = ["release", "debug"]
     compilers = ["dmd", "ldc"]
     targets = ["linux", "windows"]
@@ -8,31 +8,31 @@
     automaticallyAddOutputExtension = true   # main for linux, main.exe for windows
 
 [windows]
-    sourcePaths = [ 'C:\git\spaceHoleAndPiracy\src\' ]
+    sourcePaths = [ 'C:\git\dlawn\src\' ]
     recursiveSourcePaths = [ ]
     libPaths = [
         '.',
-        'C:\git\spaceHoleAndPiracy\winbuilddeps\lib\',  # allegro.lib
-        'C:\git\spaceHoleAndPiracy\winbuilddeps\dallegro5\', # dallegro5dmd.lib
-        'C:\git\spaceHoleAndPiracy\toml\', # toml.lib
-        'C:\git\spaceHoleAndPiracy\src\'] 
+        'C:\git\dlawn\winbuilddeps\lib\',  # allegro.lib
+        'C:\git\dlawn\winbuilddeps\dallegro5\', # dallegro5dmd.lib
+        'C:\git\dlawn\toml\', # toml.lib
+        'C:\git\dlawn\src\'] 
     recursiveLibPaths = []
     libs = [ "toml" ]
-    includePaths = ['C:\git\spaceHoleAndPiracy\src\', 'C:\git\spaceHoleAndPiracy\toml\src\', 'C:\git\spaceHoleAndPiracy\'] # we could auto add the normal source directory
-    intermediatePath = 'C:\git\spaceHoleAndPiracy\temp\' # where to store obj files for incremental build
+    includePaths = ['C:\git\dlawn\src\', 'C:\git\dlawn\toml\src\', 'C:\git\dlawn\'] # we could auto add the normal source directory
+    intermediatePath = 'C:\git\masterBuilDer\temp\' # where to store obj files for incremental build
 
 [linux] ## FIX ME
-    sourcePaths = [ 'C:\git\spaceHoleAndPiracy\src', 'C:\git\spaceHoleAndPiracy\toml\src\toml' ]
+    sourcePaths = [ 'C:\git\dlawn\src', 'C:\git\dlawn\toml\src\toml' ]
     recursiveSourcePaths = [ ]
     libPaths = [
         '.',
-        'C:\git\spaceHoleAndPiracy\winbuilddeps\lib\', 
-        'C:\git\spaceHoleAndPiracy\winbuilddeps\dallegro5', 
-        'C:\git\spaceHoleAndPiracy\toml',
-        'C:\git\spaceHoleAndPiracy\src'] 
+        'C:\git\dlawn\winbuilddeps\lib\', 
+        'C:\git\dlawn\winbuilddeps\dallegro5', 
+        'C:\git\dlawn\toml',
+        'C:\git\dlawn\src'] 
     recursiveLibPaths = []
     libs = [ "toml" ]
-    includePaths = ['C:\git\spaceHoleAndPiracy\toml\src\toml', 'C:\git\spaceHoleAndPiracy\allegro5']
+    includePaths = ['C:\git\dlawn\toml\src\toml', 'C:\git\dlawn\allegro5']
     intermediatePath = '.\temp\' # where to store obj files for incremental build
 
 [setupCode]

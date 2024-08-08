@@ -357,6 +357,7 @@ class ExeConfigType{
 		assert(pygmentizeLoc == pygmentizeLoc2);
 		}
 
+	bool makeBellOnError = true;
 	bool colorizeOutput = false;
 	bool useExternalHighlighter = false;
 	string dscannerLoc="";
@@ -615,6 +616,48 @@ void commandClean(){
 	// - delete executable
 	} // TODO FIX ME BUG
 
+string redBold    = "\x1b[1;31m";
+string greenBold  = "\x1b[0;32m"; // DOESNT WORK in win terminal
+string greenBold1 = "\x1b[0;33m";
+string greenBold2 = "\x1b[0;34m";
+string greenBold3 = "\x1b[0;35m";
+string greenBold4 = "\x1b[0;36m";
+string done = "\x1b[0m"; /// normal text
+// [0; is normal
+// [1; is Bold
+// [4; is Underline  (bit combine?)
+string colorizeAll(string input, string color){
+	return color ~ input ~ done;
+}
+
+string colorizeWord(string input, string word, string color){
+	import std.regex, std.string : splitLines;
+	auto r = regex(word);
+	string data; 
+	foreach(line; input.splitLines){
+	//	writeln("---------------", line, "--------------");
+		auto captures = line.matchFirst(r);
+		string pre = captures.pre ~ color;
+		string post = done ~ captures.post;
+		data ~= pre ~ captures[0] ~ post ~ "\n";
+		}
+	return data;
+	}
+
+string colorizeParenthesis(string input, string color){ // WHAT IF there's MULTIPLE in a line?
+	import std.regex, std.string : splitLines;
+	auto r = ctRegex!(r"\((.*)\)");
+	string data; 
+	foreach(line; input.splitLines){
+	//	writeln("---------------", line, "--------------");
+		auto captures = line.matchFirst(r);
+		string pre = captures.pre ~ color;
+		string post = done ~ captures.post;
+		data ~= pre ~ captures[0] ~ post ~ "\n";
+		}
+	return data;
+}
+
 void commandBuild(){
 	ProfileConfiguration[string]  pConfigs = runToml();
 	verboseWriteln(pConfigs);
@@ -674,7 +717,7 @@ void commandBuild(){
 		if(exeConfig.doRunCompiler){
 		auto dmd = executeShell(runString);
 		if (dmd.status != 0){
-			writeln("Compilation failed:\n", dmd.output);
+			writefln("Compilation %s failed:\n %s", "\x1b[1;31m", dmd.output);
 			}else{
 			writefln("Writing to [%s]", pConfigs[profile].outputFilename~fileExtension);
 			writeln("Compilation succeeded:\n\n", dmd.output);
@@ -686,7 +729,7 @@ void commandBuild(){
 		writeln("Would have tried to execute the following string:");
 		writeln("\t",runString);
 		}
-	}else{		
+	}else{				
 		writeln("Attempting incremental compile.\n");
 		
 		bool stopOnFirstError = true; /// do we stop on the first errored compile, or attempt all? exeConfig option?
@@ -710,7 +753,9 @@ void commandBuild(){
 					verboseWriteln("trying to execute:\t", execString);
 					auto exec = executeShell(execString);				
 					if(exec.status != 0){
-						writefln("Compilation of %s failed:\n%s", file, exec.output);
+						writefln("Compilation of \x1b[1;31m%s failed:\x1b[0;31m\n%s", file, exec.output);
+						
+						hasErrorOccurred = true;
 						if(stopOnFirstError)break;
 						}else{
 						writefln("Compilation of %s succeeded.", file);
@@ -745,12 +790,29 @@ void commandBuild(){
 				file,
 				libPathList, 
 				fileStr); 
-							
+// color codes https://gist.github.com/JBlond/2fea43a3049b38287e5e9cefc87b2124
+					
 			if(exeConfig.doRunCompiler){
 				verboseWriteln("trying to execute:\n\t", execString);
 				auto exec = executeShell(execString);				
 				if(exec.status != 0){
-						writefln("Compilation of %s failed:\n%s", file, exec.output);
+						//writefln("Compilation of %s failed:\n%s", file, exec.output);
+						writeln();
+						import std.string : replace;
+					//	import std.regex;
+					//	auto r = ctRegex!(r"\((.*)\)");						
+						string msgError = exec.output.colorizeWord("Error", redBold).colorizeParenthesis(greenBold2);
+					//	msgError = msgError.colorizeParenthesis(greenBold); WHY
+			
+						//auto msgError = captures.pre ~ "\x1b[1;31m" ~ captures[0] ~ "\x1b[1;30m" ~ captures.post;
+						// NOTE: We could replace this with findSplit most likely if we want to remove regex.
+
+						writefln("Compilation of %s \x1b[1;31mfailed\x1b[1;30m:", colorizeAll(file, greenBold4));
+						writefln("==========================================================================");
+						writefln("%s", msgError);
+						if(exeConfig.makeBellOnError)writefln("\007"); // MAKE BELL SOUND
+						hasErrorOccurred = true;
+						
 						//if(stopOnFirstError)break; // can't do breaks in parallel foreach
 						}else{
 						writefln("Compilation of %s succeeded.", file);
@@ -764,7 +826,7 @@ void commandBuild(){
 			assert(false);
 			}
 
-		if(hasErrorOccurred){writeln("Individual file compilation failed."); return;}
+		if(hasErrorOccurred){writeln("\nIndividual file compilation \x1b[1;31mfailed\x1b[1;30m."); return;}
 		}
 		
 		// then if they all succeed, compile the final product.
@@ -797,7 +859,7 @@ __gshared TargetConfiguration[string] tConfigs;
 __gshared ExeConfigType exeConfig;
 
 void setup(){	
-	exeConfig = new ExeConfigType("mbConfig.toml");
+	exeConfig = new ExeConfigType("");
 	setVerboseModeVariable(&exeConfig.doPrintVerbose); 
 	setupDefaultOSstring();
 	}

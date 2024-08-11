@@ -22,18 +22,23 @@
     intermediatePath = 'C:\git\spaceHoleAndPiracy\temp\' # where to store obj files for incremental build
 
 [linux] ## FIX ME
-    sourcePaths = [ 'C:\git\spaceHoleAndPiracy\src', 'C:\git\spaceHoleAndPiracy\toml\src\toml' ]
+    sourcePaths = ['/home/novous/Desktop/git/spaceHoleAndPiracy/src']
     recursiveSourcePaths = [ ]
     libPaths = [
         '.',
-        'C:\git\spaceHoleAndPiracy\winbuilddeps\lib\', 
-        'C:\git\spaceHoleAndPiracy\winbuilddeps\dallegro5', 
-        'C:\git\spaceHoleAndPiracy\toml',
-        'C:\git\spaceHoleAndPiracy\src'] 
+        '/home/novous/Desktop/git/spaceHoleAndPiracy/lib/', 
+        '/home/novous/Desktop/git/spaceHoleAndPiracy/toml',
+        '/home/novous/Desktop/git/spaceHoleAndPiracy/src',
+        ] 
     recursiveLibPaths = []
-    libs = [ "toml" ]
-    includePaths = ['C:\git\spaceHoleAndPiracy\toml\src\toml', 'C:\git\spaceHoleAndPiracy\allegro5']
-    intermediatePath = '.\temp\' # where to store obj files for incremental build
+    libs = [ "toml" ] # are we using this field??
+    includePaths = [
+            '/home/novous/Desktop/git/spaceHoleAndPiracy/src/',
+            '/home/novous/Desktop/git/spaceHoleAndPiracy/toml/src/',
+             '/home/novous/Desktop/git/spaceHoleAndPiracy/allegro5',
+                     '/home/novous/Desktop/git/spaceHoleAndPiracy/',
+]
+    intermediatePath = '/home/novous/Desktop/git/spaceHoleAndPiracy/temp/' # where to store obj files for incremental build
 
 [setupCode]
     getDeps = ["git submodule init", "git submodule init"]

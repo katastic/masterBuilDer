@@ -63,9 +63,8 @@ bool isHidden(DirEntry de){                             /// Because D is dumb an
 		enum FILE_ATTRIBUTE_HIDDEN = 0x02;
 		return cast(bool)(de.attributes & FILE_ATTRIBUTE_HIDDEN); //https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
 		}
-	version(Linux  ){
+	version(linux){
 		return de.isFirstLetterDot;
 		}
 	assert(0, "OS not implemented");
-	return 0;
 	}

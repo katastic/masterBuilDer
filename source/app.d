@@ -153,17 +153,21 @@ struct FilePath{
 
 		string delimeter = "ERROR";
 		version(Windows){delimeter = "\\";}
-		version(Linux){delimeter = "/";}
+		version(linux){delimeter = "/";}
 		assert(delimeter != "ERROR");
 
 		// what if we have NO SLASHES. just a raw name? (well then it's not absolute)
 //		if(!fp.isAny("\\")){
-		if(fp.isAnyAfter(".", "\\")){
+		
+		string delim = "\\";
+		version(linux)delim = "/";
+
+		if(fp.isAnyAfter(".", delim)){
 			auto idx = fp.lastIndexOf(".");
 			if(idx != -1){
 				extension = fp[idx+1..$]; // filename.d -> 'd'
 
-				auto j = fp.lastIndexOf("\\");
+				auto j = fp.lastIndexOf(delim);
 				if(j != -1){ // filename.d -> 'filename'
 					basename = fp[j+1..idx];  
 					absdir = fp[0..j];
@@ -272,6 +276,8 @@ ProfileConfiguration[string] runToml(){
 		foreach(path; tc.sourcePaths){
 				verboseWritefln("try scanning path %s for target %s", path, tc.target);
 				try{				
+					version(windows)if(tc.target != "windows")continue;
+					version(linux)if(tc.target != "linux")continue;
 					foreach(DirEntry de; dirEntries(path, "*.d", SpanMode.shallow)){
 						if(de.isHidden)
 						verboseWriteln("\t", de);
@@ -466,15 +472,15 @@ void runLint(){
 int parseModeInit(string arg){
 	verboseWritefln("parseModeInit(%s)", arg);
 	switch(arg.strip){
-		case "build": exeConfig.doRunCompiler = true ; exeConfig.modeSet = "build"; return 0; break;
-		case "try"  : exeConfig.doRunCompiler = false; exeConfig.modeSet = "build"; return 0; break;
-		case "quote": displayQuote(); return 0; break;
-		case "lint" : runLint(); return 0; break;
-		case "help" : case "man": displayHelp(); return 0; break;
-		default     : displayHelp();return 0; break;
+		case "build": exeConfig.doRunCompiler = true ; exeConfig.modeSet = "build"; return 0;
+		case "try"  : exeConfig.doRunCompiler = false; exeConfig.modeSet = "build"; return 0;
+		case "quote": displayQuote(); return 0;
+		case "lint" : runLint(); return 0;
+		case "help" : case "man": displayHelp(); return 0;
+		default     : displayHelp();return 0;
 		}
-	terminateEarlyString(arg);	
-	return -1;
+//	terminateEarlyString(arg);	
+//	return -1;
 	}
 
 /// Return: -1 on error
@@ -516,41 +522,35 @@ int parseModeBuild(string arg){
 			if     (val == "true"  || val == "yes" || val == "on" ){writeln(" * Cached mode on"); exeConfig.doCachedCompile = true; return 0;}
 			else if(val == "false" || val == "no"  || val == "off"){writeln(" * Cached mode off"); exeConfig.doCachedCompile = false; return 0;}
 			else { writefln("Unrecognized option: [%s]", val);}
-			return -1;
-		break;
+		return -1;
 		case "parallel":
 			verboseWritefln("Setting parallel=%s", value.toLower);
 			auto val = value.toLower;
 			if     (val == "true"  || val == "yes" || val == "on" ){writeln(" * Parallel mode on"); exeConfig.doParallelCompile = true; return 0;}
 			else if(val == "false" || val == "no"  || val == "off"){writeln(" * Parallel mode off"); exeConfig.doParallelCompile = false; return 0;}
 			else { writefln("Unrecognized option: [%s]", val);}
-			return -1;
-		break;		
+		return -1;
 		case "verbose":
 			verboseWritefln("Setting verbose=%s", value.toLower);
 			auto val = value.toLower;
 			if     (val == "true"  || val == "yes" || val == "on" ){writeln(" * Verbose mode on"); exeConfig.doPrintVerbose = true; return 0;}
 			else if(val == "false" || val == "no"  || val == "off"){writeln(" * Verbose mode off"); exeConfig.doPrintVerbose = false; return 0;}
 			else { writefln("Unrecognized option: [%s]", val);}
-			return -1;
-		break;
+		return -1;
 		case "profile":
 			verboseWriteln("Setting profile=", value.toLower);
 			exeConfig.selectedProfile = value.toLower;
 			// look for profile names? We need to scan profiles before this?
 			// or just let it rangeException out later.
-			return 0;
-		break;
+		return 0;
 		case "target":
 			verboseWriteln("Setting target=", value.toLower);
 			exeConfig.selectedTargetOS = value.toLower;
-			return 0;
-		break;
+		return 0;
 		case "compiler":
 			verboseWriteln("Setting compiler=", value.toLower);
 			exeConfig.selectedCompiler = value.toLower;
-			return 0;
-		break;
+		return 0;
 		case "compilerflags":
 			verboseWriteln("Setting compilerflags=", value);
 			if(value.isAny(" "))
@@ -558,8 +558,7 @@ int parseModeBuild(string arg){
 				 // .replace("\"", "\\\"")  but how do we handle embedded strings? What does OS send? Maybe already good enough.
 			else
 				exeConfig.extraCompilerFlags = value;
-			return 0;
-		break;
+		return 0;
 		case "linkerflags":
 			verboseWriteln("Setting linkerflags=", value);
 			if(value.isAny(" "))
@@ -567,15 +566,11 @@ int parseModeBuild(string arg){
 				 // .replace("\"", "\\\"")  but how do we handle embedded strings? What does OS send? Maybe already good enough.
 			else
 				exeConfig.extraLinkerFlags = value;
-			return 0;
-		break;
+		return 0;
 		default:
 		terminateEarlyString(arg);
 		return -1;
-		break;
 		}
-	assert(0, "this shouldn't happen. (Did the dev forget a switch return?)");
-	return -1;
 	}
 
 void setForwardArguments(string arg){
@@ -618,6 +613,8 @@ void commandClean(){
 void commandBuild(){
 	ProfileConfiguration[string]  pConfigs = runToml();
 	verboseWriteln(pConfigs);
+	version(Windows)string binaryExtension = ".obj";
+	version(linux)string binaryExtension = ".o";
     string filesList = "";
     string filesObjList = "";
 	auto targetOS = exeConfig.selectedTargetOS;
@@ -630,7 +627,7 @@ void commandBuild(){
 	foreach(t; tConfigs)verboseWriteln(t.sourceFilesFound);
 	foreach(file; tConfigs[targetOS].sourceFilesFound2){
 		filesList ~= file.fullPathAndName ~ " "; //file ~ " ";
-		filesObjList ~= tConfigs[targetOS].intermediatePath ~ file.filename.replace(".d",".obj") ~ " ";
+		filesObjList ~= tConfigs[targetOS].intermediatePath ~ file.filename.replace(".d",binaryExtension) ~ " ";
 		}
 	verboseWriteln("filesObjList - ", filesObjList);
 	verboseWritefln("Files List \"%s\"\n", filesList);
@@ -646,7 +643,7 @@ void commandBuild(){
 			case("linux"):   libPathList ~= "-L-L"~libpath~" "; 		break;
 			case("windows"): libPathList ~= "-L/LIBPATH:"~libpath~" ";	break;
 			case("macosx") : assert(0, "macosx not tested");
-			default:		 assert(0, format("invalid target name [%s]", profile)); break;
+			default:		 assert(0, format("invalid target name [%s]", profile));
 			}
 		}
 	verboseWritefln("\t\"%s\"", libPathList);
@@ -733,7 +730,7 @@ void commandBuild(){
 		try{
 		foreach(immutable file; taskPool.parallel(changedFiles)){
 			immutable FilePath filepath = FilePath(file);
-			string fileStr = tConfigs[targetOS].intermediatePath ~ filepath.basename ~ ".obj";
+			string fileStr = tConfigs[targetOS].intermediatePath ~ filepath.basename ~ binaryExtension;
 			string includePathsStr;
 			foreach(p; tConfigs[targetOS].includePaths)
 				includePathsStr ~= format("-I%s ", p);
@@ -797,7 +794,7 @@ __gshared TargetConfiguration[string] tConfigs;
 __gshared ExeConfigType exeConfig;
 
 void setup(){	
-	exeConfig = new ExeConfigType("mbConfig.toml");
+	exeConfig = new ExeConfigType("");
 	setVerboseModeVariable(&exeConfig.doPrintVerbose); 
 	setupDefaultOSstring();
 	}
@@ -805,8 +802,8 @@ void setup(){
 void setupDefaultOSstring(){
 	exeConfig.selectedTargetOS = "excuse me, wat"; // default fail case.
 	version(Windows)exeConfig.selectedTargetOS = "windows";
-	version(Linux)exeConfig.selectedTargetOS   = "linux";
-	version(MacOSX)exeConfig.selectedTargetOS  = "macos";
+	version(linux)exeConfig.selectedTargetOS   = "linux";
+	version(MacOSX)exeConfig.selectedTargetOS  = "macosx";
 	}
 
 int main(string[] args){

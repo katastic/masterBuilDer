@@ -9,6 +9,11 @@
 	-L-L
 
 	i think we want -ldallegro5dmd -> becomes -> libdallegro5dmd.a
+
+	- TODO: We need to understand/allow understanding static vs dynamic linking of libraries such as Allegro. It could be as simple as writing another profile in the toml, such as release-static and release-dynamic.
+
+	- TODO FUN: Implement pre/post script functionality. Do we run a separate script on fail, or send PASS/FAIL as an argument to the script? Either might be fine. And where best to store these scripts? We can do ./scripts/build/triggers. Not sure if we need /build/ for anything else but people may think you're supposed to use them manually if they're in /build.
+		or just /scripts/triggers 
 +/
 
 module app;
@@ -838,12 +843,13 @@ void commandBuild(){
 
 		if(hasErrorOccurred){writeln("\nIndividual file compilation \x1b[1;31mfailed\x1b[1;30m."); return;}
 		}
-		
-	
-string libs = "";
-foreach(lib; tConfigs[targetOS].libs){	
-	libs ~= "-L-l" ~ lib ~ " ";
-	}
+			
+		string libs = "";
+		string linuxLibraryPrefix = "-L-l";
+		string windowsLibraryPrefix = "-LsomethingTODO";
+		foreach(lib; tConfigs[targetOS].libs){	 //TODO: make sure this works for windows
+			libs ~= linuxLibraryPrefix ~ lib ~ " "; // e.g.  -L-lallegro -> -lallegro -> liballegro.a
+			}
 
 		// then if they all succeed, compile the final product.
 		runString = "dmd -of=" ~ pConfigs[profile].outputFilename~fileExtension ~ 

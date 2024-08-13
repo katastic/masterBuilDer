@@ -1,3 +1,16 @@
+
+/+
+	dmd uses -L to pass command to linker
+	ld for linux
+		-l/path/to/library		where library = library.a unless you PREFIX the path with :
+		-L/path/to/librarydirectory
+	so
+	-L-l  and
+	-L-L
+
+	i think we want -ldallegro5dmd -> becomes -> libdallegro5dmd.a
++/
+
 module app;
 import utility;
 
@@ -381,7 +394,7 @@ class ExeConfigType{
 	
 	string selectedProfile 	= "release";
 	string selectedCompiler = "dmd";
-	string selectedTargetOS = "windows";  // set by version statement in main.
+	string selectedTargetOS = "SETME";  // set by version statement in main.
 
 	string buildScriptFileName 	= "buildConfig.toml"; /// Unless overriden with option TODO
 	string cacheFileName 		= "buildFileCache.toml"; // should this be in the buildConfig?
@@ -826,13 +839,21 @@ void commandBuild(){
 		if(hasErrorOccurred){writeln("\nIndividual file compilation \x1b[1;31mfailed\x1b[1;30m."); return;}
 		}
 		
+	
+string libs = "";
+foreach(lib; tConfigs[targetOS].libs){	
+	libs ~= "-L-l" ~ lib ~ " ";
+	}
+
 		// then if they all succeed, compile the final product.
 		runString = "dmd -of=" ~ pConfigs[profile].outputFilename~fileExtension ~ 
 		  	" " ~ flags ~ " " ~	
 			filesObjList.replace(
 					tConfigs[targetOS].sourcePaths[0],
 					tConfigs[targetOS].intermediatePath) ~ " " ~ 
-			libPathList ~ " " ~ exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags;
+			libPathList ~ " " ~ 
+			libs ~ " " ~
+			 exeConfig.extraCompilerFlags ~ " " ~ exeConfig.extraLinkerFlags;
 
 		if(!exeConfig.doRunCompiler){
 			writeln();

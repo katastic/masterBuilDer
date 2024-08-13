@@ -14,6 +14,18 @@
 
 	- TODO FUN: Implement pre/post script functionality. Do we run a separate script on fail, or send PASS/FAIL as an argument to the script? Either might be fine. And where best to store these scripts? We can do ./scripts/build/triggers. Not sure if we need /build/ for anything else but people may think you're supposed to use them manually if they're in /build.
 		or just /scripts/triggers 
+
+	- ERROR: Multi compile continues even if one fails. It might only be if the COMPILE fails but without a source code error (a link/import failure)
+	
+	- BUG: still loading linux from windows build. oh god, is Windows Terminal firing off linux???
+
+	we need to add a LINT check for the absurd stupidty that is version strings
+		version(Windows)   	uppercase!
+		version(linux) 		lowercase!
+		version(windows)	NO ERROR. silently does nothing.
+		version(Linux)		NO ERROR. silently does nothing.
+
+	- verboseWriteln is wrong. it adds newlines for each element.
 +/
 
 module app;
@@ -268,12 +280,14 @@ ProfileConfiguration[string] runToml(){
 
 	string[] compilerNames = convTOMLtoArray(doc["project"]["compilers"]);
 	foreach(m, n; doc["modeStrings"]){
-		verboseWriteln("[",m, "] = ", n[0], "/", n[1], " of type ", n.type); // string. note: hardcoded with number of compilers
+	//	verboseWrite("[",m, "] = ", n[0], "/", n[1], " of type ", n.type); // string. note: hardcoded with number of compilers
 		ModeStringConfig _modeString;
 		foreach(i, t; n.array){_modeString.modePerCompiler[compilerNames[i]] ~= t.str;}
 		globalConfig.modeStrings[m] = _modeString;
 		}
-	verboseWriteln(globalConfig);	
+	verboseWriteln(globalConfig);
+	
+	auto OS = exeConfig.selectedTargetOS;
 
 	foreach(t; targets){
 		TargetConfiguration tc;
@@ -290,12 +304,13 @@ ProfileConfiguration[string] runToml(){
 
 		tc.includePaths 		= convTOMLtoArray(d["includePaths"]);
 		tc.intermediatePath 	= d["intermediatePath"].str;
-
+		//writeln("tc.target: ", tc.target);
 		foreach(path; tc.sourcePaths){
+				version(Windows)if(tc.target != "windows"){verboseWriteln("skip non-windows config file scanning."); continue;}
+				version(linux)if(tc.target != "linux"){verboseWriteln("skip non-linux config file scanning."); continue;}
 				verboseWritefln("try scanning path %s for target %s", path, tc.target);
 				try{				
-					version(windows)if(tc.target != "windows")continue;
-					version(linux)if(tc.target != "linux")continue;
+					
 					foreach(DirEntry de; dirEntries(path, "*.d", SpanMode.shallow)){
 						if(de.isHidden)
 						verboseWriteln("\t", de);
@@ -322,8 +337,8 @@ ProfileConfiguration[string] runToml(){
 		string temp;
 		string currentCompiler = "dmd"; // TODO FIXME.  compilerNames[i]?
 		foreach(i, m; modeArray){
-			verboseWriteln(i, m);
-			verboseWritefln("\tfound mode ", m.str);
+			//verboseWriteln(i, m);
+			//verboseWritefln("\tfound mode ", m.str);
 			temp ~= globalConfig.modeStrings[m.str].modePerCompiler[currentCompiler] ~ " ";
 			}
 		pc.mode = temp;
@@ -639,6 +654,9 @@ string done = "\x1b[0m"; /// normal text
 // [0; is normal
 // [1; is Bold
 // [4; is Underline  (bit combine?)
+string color(string input, string theColor){
+	return theColor ~ input ~ done;
+}
 string colorizeAll(string input, string color){
 	return color ~ input ~ done;
 }
@@ -732,10 +750,10 @@ void commandBuild(){
 		if(exeConfig.doRunCompiler){
 		auto dmd = executeShell(runString);
 		if (dmd.status != 0){
-			writefln("Compilation %s failed:\n %s", "\x1b[1;31m", dmd.output);
+			writeln("Compilation %s %s:\n %s", "\x1b[1;31m", color("failed", redBold), dmd.output);
 			}else{
 			writefln("Writing to [%s]", pConfigs[profile].outputFilename~fileExtension);
-			writeln("Compilation succeeded:\n\n", dmd.output);
+			writeln("Compilation ", color(greenBold, "succeeded"), ":\n\n", dmd.output);
 			writeln();
 			exeConfig.didCompileSucceed = true;
 			fcl.saveResults();
@@ -865,13 +883,13 @@ void commandBuild(){
 			writeln();
 			writeln("Would have tried to execute (executable):\n\t", runString);
 			}else{
-			writeln("Trying to execute:\n\t", runString);
+			writeln("\nTrying to execute:\n\t", runString);
 			auto dmd = executeShell(runString);				
 			if(dmd.status != 0){
 				writeln();
-				writefln("Compilation failed:\n\n%s", dmd.output);
+				writeln("\nCompilation ", color("failed", redBold), "\n", dmd.output);
 				}else{
-				writefln("Compilation succeeded.\n");
+				writeln("\nCompilation ", color("succeeded", greenBold),".");
 				}
 			}
 		}

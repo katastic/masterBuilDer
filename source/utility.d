@@ -6,7 +6,7 @@
 module utility;
 import toml;
 import std.array;
-import std.stdio : writeln, writefln;
+import std.stdio : write, writeln, writefln;
 import std.string : indexOfAny;
 import std.algorithm : map;
 
@@ -29,8 +29,16 @@ string[] convTOMLtoArray(TOMLValue t){
 	}
 
 /// Only print if doPrintVerbose is true, exact replacement for writeln
+void verboseWrite(A...)(A a){  // todo: what about fln version. Pass in a std.format is all needed?
+    assert(doVerboseMode !is null, "doVerboseMode pointer is null!");
+	if(!*doVerboseMode)return;
+	foreach(t; a)write(t);	
+	//if(exeConfig.doPrintVerbose)foreach(t; a)writeln(t);
+	}
+
+/// Only print if doPrintVerbose is true, exact replacement for writeln
 void verboseWriteln(A...)(A a){  // todo: what about fln version. Pass in a std.format is all needed?
-    assert(doVerboseMode !is null, "doVerboseMode is null!");
+    assert(doVerboseMode !is null, "doVerboseMode pointer is null!");
 	if(!*doVerboseMode)return;
 	foreach(t; a)writeln(t);	
 	//if(exeConfig.doPrintVerbose)foreach(t; a)writeln(t);
@@ -38,7 +46,7 @@ void verboseWriteln(A...)(A a){  // todo: what about fln version. Pass in a std.
 
 /// adapted from from function signatures here: https://github.com/dlang/phobos/blob/master/std/stdio.d
 void verboseWritefln(alias fmt, A...)(A args){
-    assert(doVerboseMode !is null, "doVerboseMode is null!");
+    assert(doVerboseMode !is null, "doVerboseMode pointer is null!");
     if (isSomeString!(typeof(fmt))){
 		if(!*doVerboseMode)return;
         return writefln(fmt, args);
@@ -47,7 +55,7 @@ void verboseWritefln(alias fmt, A...)(A args){
 
 /// adapted from from function signatures here: https://github.com/dlang/phobos/blob/master/std/stdio.d
 void verboseWritefln(Char, A...)(in Char[] fmt, A args){
-    assert(doVerboseMode !is null, "doVerboseMode is null!");
+    assert(doVerboseMode !is null, "doVerboseMode pointer is null!");
     if(!*doVerboseMode)return;
     writefln(fmt, args);
     }

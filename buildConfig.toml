@@ -21,23 +21,21 @@
     includePaths = ['C:\git\spaceHoleAndPiracy\src\', 'C:\git\spaceHoleAndPiracy\toml\src\', 'C:\git\spaceHoleAndPiracy\'] # we could auto add the normal source directory
     intermediatePath = 'C:\git\spaceHoleAndPiracy\temp\' # where to store obj files for incremental build
 
-[linux] ## FIX ME
+[linux]
     sourcePaths = ['/home/novous/Desktop/git/spaceHoleAndPiracy/src']
     recursiveSourcePaths = [ ]
     libPaths = [
         '.',
         '/home/novous/Desktop/git/spaceHoleAndPiracy/lib/', 
         '/home/novous/Desktop/git/spaceHoleAndPiracy/toml',
-        '/home/novous/Desktop/git/spaceHoleAndPiracy/src',
-        ] 
+        '/home/novous/Desktop/git/spaceHoleAndPiracy/src'] 
     recursiveLibPaths = []
     libs = [ "toml", "dallegro5dmd", "allegro", "allegro_primitives", "allegro_image", "allegro_ttf", "allegro_font"  ] # are we using this field??
     includePaths = [
             '/home/novous/Desktop/git/spaceHoleAndPiracy/src/',
             '/home/novous/Desktop/git/spaceHoleAndPiracy/toml/src/',
              '/home/novous/Desktop/git/spaceHoleAndPiracy/allegro5',
-                     '/home/novous/Desktop/git/spaceHoleAndPiracy/',
-]
+                     '/home/novous/Desktop/git/spaceHoleAndPiracy/']
     intermediatePath = '/home/novous/Desktop/git/spaceHoleAndPiracy/temp/' # where to store obj files for incremental build
 
 [setupCode]

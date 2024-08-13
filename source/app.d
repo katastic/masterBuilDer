@@ -10,13 +10,15 @@
 
 	i think we want -ldallegro5dmd -> becomes -> libdallegro5dmd.a
 
+	- TODO: Fix/add relative paths!
+
 	- TODO: We need to understand/allow understanding static vs dynamic linking of libraries such as Allegro. It could be as simple as writing another profile in the toml, such as release-static and release-dynamic.
 
 	- TODO FUN: Implement pre/post script functionality. Do we run a separate script on fail, or send PASS/FAIL as an argument to the script? Either might be fine. And where best to store these scripts? We can do ./scripts/build/triggers. Not sure if we need /build/ for anything else but people may think you're supposed to use them manually if they're in /build.
 		or just /scripts/triggers 
 
 	- ERROR: Multi compile continues even if one fails. It might only be if the COMPILE fails but without a source code error (a link/import failure)
-	
+
 	- BUG: still loading linux from windows build. oh god, is Windows Terminal firing off linux???
 
 	we need to add a LINT check for the absurd stupidty that is version strings
@@ -372,7 +374,7 @@ class ExeConfigType{
 		// CANT use verbosewriteln, it needs THIS setup.
 		try{
 			string newPath = filepath ~ "mbConfig.toml";
-			writeln("Using config file at", newPath);
+			writeln("Using config file at ", newPath);
 			string data = cast(string)read(newPath);//r"C:\git\masterBuilDer\mbConfig.toml");
 			doc = parseTOML(data);
 		}catch(Exception e){

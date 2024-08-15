@@ -457,8 +457,9 @@ void displayHelp(){
 /// Display a quote
 void displayQuote(){
 	import quotes, std.random;
+	int quoteNumber =  uniform!"[]"(0, cast(int)quoteStrings.length-1);
 	writeln();
-	writefln("\"%s\"", quoteStrings[ uniform!"[]"(0, cast(int)quoteStrings.length-1)] );
+	writefln("\"%s\"", quoteStrings[quoteNumber].wordWrap(80) ); // we don't know the terminal width though. More effort than worth to cross-platform that. So use 80.
 	writeln();
 	}
 

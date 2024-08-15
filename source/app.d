@@ -1,14 +1,16 @@
 
 /+
-	dmd uses -L to pass command to linker
-	ld for linux
-		-l/path/to/library		where library = library.a unless you PREFIX the path with :
-		-L/path/to/librarydirectory
-	so
-	-L-l  and
-	-L-L
 
-	i think we want -ldallegro5dmd -> becomes -> libdallegro5dmd.a
+	- TODO: use mb.exe instead of masterbuilder[.exe]
+	
+	- TODO: instead of mb [try/build] it should just build by default, and if you add try, it does try.
+		- any peculilarities with our variable system?  (mb.exe try verbose=yes)
+
+	- TODO: Many variables probably need exposed. color=yes/no/auto
+		- Is there a way to cross-platform detect terminal width, and color support?
+			- we might need ncurses, etc for that which I would want shimmed to another file and also I like keeping the deps as minimal as possible.
+				- there is a dub ncurses lib
+					https://code.dlang.org/packages/ncurses
 
 	- TODO: Fix/add relative paths!
 
@@ -18,8 +20,6 @@
 		or just /scripts/triggers 
 
 	- ERROR: Multi compile continues even if one fails. It might only be if the COMPILE fails but without a source code error (a link/import failure)
-
-	- BUG: still loading linux from windows build. oh god, is Windows Terminal firing off linux???
 
 	we need to add a LINT check for the absurd stupidty that is version strings
 		version(Windows)   	uppercase!
@@ -35,12 +35,12 @@ import utility;
 
 import std.process, std.path, std.stdio;
 import std.format, std.file;
-import toml;
 import std.parallelism;
 import std.string : indexOf, indexOfAny, lastIndexOf, replace, toLower, strip;
 import std.algorithm : map;
 import std.array : array;
 import std.conv : to;
+import toml;
 
 /// Scan for files in source directories, and compare differences with stored TOML hashes.
 final class FileCacheList{	
@@ -374,7 +374,7 @@ class ExeConfigType{
 		// CANT use verbosewriteln, it needs THIS setup.
 		try{
 			string newPath = filepath ~ "mbConfig.toml";
-			writeln("Using config file at ", newPath);
+			writeln("Using config file at [", newPath,"]");
 			string data = cast(string)read(newPath);//r"C:\git\masterBuilDer\mbConfig.toml");
 			doc = parseTOML(data);
 		}catch(Exception e){
@@ -427,7 +427,7 @@ class ExeConfigType{
 /// Display help prompt
 void displayHelp(){
 	writeln("");
-	writeln("  masterBuilder[.exe] [command] [option=value] [option=value] -- args");
+	writeln("  mb[.exe] [command] [option=value] [option=value] -- args");
 	writeln("");
 	writeln("\tinit  - create a default build config. TODO.");
 	writeln("\trun   - run the program");
@@ -472,8 +472,8 @@ void runLint(){
 	import std.algorithm.searching : canFind;
 	import std.algorithm.iteration : each;
 	import toml;
-	// TODO	
-	runToml();
+	// TODO	FIX
+	auto discardedValue = runToml();
 	//TOMLDocument doc = parseTOML(cast(string)read(buildConfig.toml));
 
 	auto targetOS = exeConfig.selectedTargetOS;
@@ -833,13 +833,9 @@ void commandBuild(){
 				auto exec = executeShell(execString);				
 				if(exec.status != 0){
 						//writefln("Compilation of %s failed:\n%s", file, exec.output);
-						writeln();
-						import std.string : replace;
-					//	import std.regex;
-					//	auto r = ctRegex!(r"\((.*)\)");						
+						writeln();														
 						string msgError = exec.output.colorizeWord("Error", redBold).colorizeParenthesis(greenBold2);
-					//	msgError = msgError.colorizeParenthesis(greenBold); WHY
-			
+				
 						//auto msgError = captures.pre ~ "\x1b[1;31m" ~ captures[0] ~ "\x1b[1;30m" ~ captures.post;
 						// NOTE: We could replace this with findSplit most likely if we want to remove regex.
 

@@ -19,8 +19,6 @@
 
 	- ERROR: Multi compile continues even if one fails. It might only be if the COMPILE fails but without a source code error (a link/import failure)
 
-	- BUG: still loading linux from windows build. oh god, is Windows Terminal firing off linux???
-
 	we need to add a LINT check for the absurd stupidty that is version strings
 		version(Windows)   	uppercase!
 		version(linux) 		lowercase!
@@ -43,7 +41,7 @@ import std.array : array;
 import std.conv : to;
 
 /// Scan for files in source directories, and compare differences with stored TOML hashes.
-final class FileCacheList{	
+final class FileCacheList {	
 	import std.digest.crc;
 	string dir;
 	fileHashes database;
@@ -114,7 +112,6 @@ final class FileCacheList{
 			}
 		}
 
-	// TODO: specify alternate build file support in exeConfig or something.
 	fileHashes scanCachedHashes(){
 		fileHashes results;
 		try{

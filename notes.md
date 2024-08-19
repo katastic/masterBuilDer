@@ -1,4 +1,16 @@
 [[masterBuilDer]]
+	dmd uses -L to pass command to linker
+	ld for linux
+		-l/path/to/library		where library = library.a unless you PREFIX the path with :
+		-L/path/to/librarydirectory
+	so
+	-L-l  and
+	-L-L
+
+	i think we want -ldallegro5dmd -> becomes -> libdallegro5dmd.a
+
+
+
 
     - Should we be separating runToml into profile vs global scans?
 
@@ -18,7 +30,7 @@
             
             quotes will have to be manually parsed. Make sure shell won't modify quote marks, single quotes, etc. Though, if you're specifying weird, long stuff, how about just edit the CONFIG FILE?
 
-    - basic ASCII colorize.
+    + basic ASCII colorize.
 
     - we could add multiple stage compile for template string substitution phase built in. So if the first phase fails, it stops and reports.
     - 'mb' for short?
@@ -60,7 +72,7 @@
     - function/class length warner. (is there an easy non-AST way to do this?)
 
 
-    - we can COLORIZE output with ascii codes. [can we detect a proper terminal on windows?]
+    + we can COLORIZE output with ascii codes. [can we detect a proper terminal on windows?]
         - highlight output path only, in the output string. or other important info
 
         - not sure how 'try' would work with intermediates. it would still have to make the intermediates just not the final build.

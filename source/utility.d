@@ -13,6 +13,24 @@ import std.algorithm : map;
 alias fileHashes = string[string];
 __gshared bool *doVerboseMode;
 
+/// Return a word-wrapped string at length
+string wordWrap(string text, uint length){ 
+	import std.string, std.array;
+	string lineBuffer = "";
+	string[] words = text.split(" ");
+	string output = "";
+	foreach(word; words){
+		if(lineBuffer.length + word.length < length){
+			lineBuffer ~= word ~ " ";
+			}else{
+			output ~= lineBuffer ~ "\n";
+			lineBuffer = "" ~ word ~ " ";
+			}
+		}
+	if(lineBuffer.length != 0)output ~= lineBuffer;
+	return output.stripRight; // strip last space
+	}
+
 void setVerboseModeVariable(bool *_doVerboseMode){
     doVerboseMode = _doVerboseMode;
     }

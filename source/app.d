@@ -28,6 +28,22 @@
 		version(Linux)		NO ERROR. silently does nothing.
 
 	- verboseWriteln is wrong. it adds newlines for each element.
+
+
+
+BUG on command line colorizing:
+
+
+	Compilation of /home/novous/Desktop/git/spaceHoleAndPiracy/src/app.d failed:
+	==========================================================================
+	/home/novous/Desktop/git/spaceHoleAndPiracy/src/objects.d(21): Error: undefined identifier `Ship`
+	/home/novous/Desktop/git/spaceHoleAndPiracy/src/objects.d(30): Error: undefined identifier `Ship`
+	/home/novous/Desktop/git/spaceHoleAndPiracy/src/objects.d(141): Error: undefined identifier `Ship`
+	/home/novous/Desktop/git/spaceHoleAndPiracy/src/objects.d(146): Error: undefined identifier `Ship`
+	using DMD version of dallegrousing DMD version of dallegrousing DMD version of dallegrousing DMD version of dallegro
+
+note end text, as well as FIRST LINE text before (21): is BLACK but copyable!
+
 +/
 
 module app;
@@ -838,7 +854,7 @@ void commandBuild(){
 						//auto msgError = captures.pre ~ "\x1b[1;31m" ~ captures[0] ~ "\x1b[1;30m" ~ captures.post;
 						// NOTE: We could replace this with findSplit most likely if we want to remove regex.
 
-						writefln("Compilation of %s \x1b[1;31mfailed\x1b[1;30m:", colorizeAll(file, greenBold4));
+						writefln("Compilation of %s %s", color(file, greenBold4), color("failed", redBold));
 						writefln("==========================================================================");
 						writefln("%s", msgError);
 						if(exeConfig.makeBellOnError)writefln("\007"); // MAKE BELL SOUND

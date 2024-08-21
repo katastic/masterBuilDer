@@ -1,7 +1,6 @@
-
 /+
 
-	- TODO: use mb.exe instead of masterbuilder[.exe]
+	- we can set the working directory of executeShell! Maybe set it to our root directory? The config directory?
 	
 	- TODO: instead of mb [try/build] it should just build by default, and if you add try, it does try.
 		- any peculilarities with our variable system?  (mb.exe try verbose=yes)
@@ -29,25 +28,16 @@
 
 	- verboseWriteln is wrong. it adds newlines for each element.
 
+	- BUG, pragma(msg, "using dmd version of allegro") is just output multiple times and spammed into a single text buffer. maybe it's STDERR.
 
-
-BUG on command line colorizing:
-
-
-	Compilation of /home/novous/Desktop/git/spaceHoleAndPiracy/src/app.d failed:
-	==========================================================================
-	/home/novous/Desktop/git/spaceHoleAndPiracy/src/objects.d(21): Error: undefined identifier `Ship`
-	/home/novous/Desktop/git/spaceHoleAndPiracy/src/objects.d(30): Error: undefined identifier `Ship`
-	/home/novous/Desktop/git/spaceHoleAndPiracy/src/objects.d(141): Error: undefined identifier `Ship`
-	/home/novous/Desktop/git/spaceHoleAndPiracy/src/objects.d(146): Error: undefined identifier `Ship`
-	using DMD version of dallegrousing DMD version of dallegrousing DMD version of dallegrousing DMD version of dallegro
-
-note end text, as well as FIRST LINE text before (21): is BLACK but copyable!
-
+------------
+	+ BUG on command line colorizing. FIXED.
+	+ TODO: use mb.exe instead of masterbuilder[.exe]
 +/
 
 module app;
 import utility;
+import help;
 
 import std.process, std.path, std.stdio;
 import std.format, std.file;
@@ -439,36 +429,6 @@ class ExeConfigType{
 	string extraLinkerFlags 	= "";
 	}
 
-/// Display help prompt
-void displayHelp(){
-	writeln("");
-	writeln("  mb[.exe] [command] [option=value] [option=value] -- args");
-	writeln("");
-	writeln("\tinit  - create a default build config. TODO.");
-	writeln("\trun   - run the program");
-	writeln("\tbuild - actually build");
-	writeln("\tclean - clean up temporary files");
-	writeln("\tcheck - check if any files have changed and list them.");
-	writeln("\ttry   - see if the build config would produce a compiler command");
-	writeln("\tlint  - run DScanner");
-	writeln("\tquote - recieve a verse about the Master Builder");
-	writeln("\thelp  - this help screen.");
-	writeln("");
-	writeln("\tOptions:");
-	writeln("\t\tprofile=name/of/profile (profile=release, profile=debug, etc)");
-	writeln("\t\ttarget=windows/linux (Use commands for a different OS. Default: Your host OS.)");
-	writeln("\t\tcompilerflags=\"taco is a bad man\" (use shell quotes for strings with spaces) ");
-	writeln("\t\tlinkerflags=--test                  (quotes not required if no spaces)");
-	writeln("");
-	writeln("\tFor passing commandline arguments to the program, use -- to end");
-	writeln("\t  internal processing of args and send them to the program.");
-	writeln("");
-	writeln("\tExample usage:");
-	writeln("");
-	writeln("\t masterBuilder build profile=debug -- hello!");
-	writeln("\t  - build profile named debug, run, and pass it \"hello!\" ");
-	}
-
 /// Display a quote
 void displayQuote(){
 	import quotes, std.random;
@@ -804,12 +764,12 @@ void commandBuild(){
 					verboseWriteln("trying to execute:\t", execString);
 					auto exec = executeShell(execString);				
 					if(exec.status != 0){
-						writefln("Compilation of \x1b[1;31m%s failed:\x1b[0;31m\n%s", file, exec.output);
+						writefln("Compilation of %s %s:\n%s", color(file, greenBold3), color("failed", redBold), exec.output.colorizeParenthesis(redBold).colorizeWord("Error", redBold));
 						
 						hasErrorOccurred = true;
 						if(stopOnFirstError)break;
 						}else{
-						writefln("Compilation of %s succeeded.", file);
+						writefln("Compilation of %s succeeded.", color(file, greenBold3));
 						}
 					}else{
 					writeln("Would have tried to execute (file to obj):\n\n\t", execString);

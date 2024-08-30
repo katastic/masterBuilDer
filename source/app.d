@@ -1,6 +1,8 @@
 /+
 
-	--> why aren't we outputing main.exe (windows) to the output directory????
+	-> we need "go" command or whatever. compile and run if successful.
+
+	+  why aren't we outputing main.exe (windows) to the output directory????
 		of=main.exe !!!
 
 		we probably want a projectRootPath, and then an output path if different!

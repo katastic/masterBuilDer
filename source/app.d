@@ -804,9 +804,10 @@ void commandBuild(){
 		// stdout race conditions, and also only display stderr of those that fail.
 
 		try{
+			// COMPILE INTERMEDIATES.
 		foreach(immutable file; taskPool.parallel(changedFiles)){
 			immutable FilePath filepath = FilePath(file);
-			string outputFileStr = tConfigs[targetOS].projectRootPath ~ filepath.basename ~ binaryExtension;
+			string outputFileStr = tConfigs[targetOS].intermediatePath ~ filepath.basename ~ binaryExtension;
 			string includePathsStr;
 			foreach(p; tConfigs[targetOS].includePaths)
 				includePathsStr ~= format("-I%s ", p);
@@ -855,9 +856,18 @@ void commandBuild(){
 			
 		string libs = "";
 		string linuxLibraryPrefix = "-L-l";
-		string windowsLibraryPrefix = "-LsomethingTODO";
+		string windowsLibraryPrefix = "-L/LIBPATH:";
+		//writeln("TARGET OS IS ", targetOS);
 		foreach(lib; tConfigs[targetOS].libs){	 //TODO: make sure this works for windows
-			libs ~= linuxLibraryPrefix ~ lib ~ " "; // e.g.  -L-lallegro -> -lallegro -> liballegro.a
+			string prefix;
+			if(targetOS == "windows") 
+				prefix = windowsLibraryPrefix;
+			else if(targetOS == "linux") 
+				prefix = linuxLibraryPrefix;
+			else 
+				assert(0,"excuse me what.");
+
+			libs ~= prefix ~ lib ~ " "; // e.g.  -L-lallegro -> -lallegro -> liballegro.a
 			}
 
 		// then if they all succeed, compile the final product.

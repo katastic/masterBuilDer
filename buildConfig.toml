@@ -8,6 +8,8 @@
     automaticallyAddOutputExtension = true   # main for linux, main.exe for windows
 
 [windows]
+    outputPath = ''
+    projectRootPath = 'C:\git\spaceHoleAndPiracy\'
     sourcePaths = [ 'C:\git\spaceHoleAndPiracy\src\' ]
     recursiveSourcePaths = [ ]
     libPaths = [
@@ -22,6 +24,8 @@
     intermediatePath = 'C:\git\spaceHoleAndPiracy\temp\' # where to store obj files for incremental build
 
 [linux]
+    outputPath = ''
+    projectRootPath = '/home/novous/Desktop/git/spaceHoleAndPiracy/'
     sourcePaths = ['/home/novous/Desktop/git/spaceHoleAndPiracy/src']
     recursiveSourcePaths = [ ]
     libPaths = [

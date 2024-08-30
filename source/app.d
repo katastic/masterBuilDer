@@ -1,5 +1,13 @@
 /+
 
+	--> why aren't we outputing main.exe (windows) to the output directory????
+		of=main.exe !!!
+
+		we probably want a projectRootPath, and then an output path if different!
+
+		DETECT if root or relative? Or set a config? for all other paths
+		DETECT if root or relative? Or set a config? for all other paths
+
 	- we can set the working directory of executeShell! Maybe set it to our root directory? The config directory?
 	
 	- TODO: instead of mb [try/build] it should just build by default, and if you add try, it does try.
@@ -239,6 +247,9 @@ struct TargetConfiguration{
 	string[] includePaths;   /// where to find dependency source files (but NOT compile them)
 	string intermediatePath; /// where intermediate binary files go
 
+	string outputPath;
+	string projectRootPath;
+
 	// enumerated data
 	string[] sourceFilesFound;
 	FilePath[] sourceFilesFound2;
@@ -255,6 +266,8 @@ ProfileConfiguration[string] runToml(){
 	import toml;
 	TOMLDocument doc;
 
+	//exeConfig parsing
+	//------------------------------------------------------------------------------------
 	verboseWriteln(readText(exeConfig.buildScriptFileName));
 	doc = parseTOML(cast(string)read(exeConfig.buildScriptFileName));
 	
@@ -311,6 +324,10 @@ ProfileConfiguration[string] runToml(){
 
 		tc.includePaths 		= convTOMLtoArray(d["includePaths"]);
 		tc.intermediatePath 	= d["intermediatePath"].str;
+		
+		tc.outputPath = d["outputPath"].str;
+		tc.projectRootPath = d["projectRootPath"].str;
+
 		//writeln("tc.target: ", tc.target);
 		foreach(path; tc.sourcePaths){
 				version(Windows)if(tc.target != "windows"){verboseWriteln("skip non-windows config file scanning."); continue;}
@@ -789,7 +806,7 @@ void commandBuild(){
 		try{
 		foreach(immutable file; taskPool.parallel(changedFiles)){
 			immutable FilePath filepath = FilePath(file);
-			string fileStr = tConfigs[targetOS].intermediatePath ~ filepath.basename ~ binaryExtension;
+			string outputFileStr = tConfigs[targetOS].projectRootPath ~ filepath.basename ~ binaryExtension;
 			string includePathsStr;
 			foreach(p; tConfigs[targetOS].includePaths)
 				includePathsStr ~= format("-I%s ", p);
@@ -800,7 +817,7 @@ void commandBuild(){
 				pConfigs[exeConfig.selectedProfile].mode,
 				file,
 				libPathList, 
-				fileStr); 
+				outputFileStr); 
 // color codes https://gist.github.com/JBlond/2fea43a3049b38287e5e9cefc87b2124
 					
 			if(exeConfig.doRunCompiler){
@@ -844,7 +861,8 @@ void commandBuild(){
 			}
 
 		// then if they all succeed, compile the final product.
-		runString = "dmd -of=" ~ pConfigs[profile].outputFilename~fileExtension ~ 
+		string outputFileStr = tConfigs[targetOS].projectRootPath ~ pConfigs[profile].outputFilename ~ fileExtension;
+		runString = "dmd -of=" ~ outputFileStr ~ 
 		  	" " ~ flags ~ " " ~	
 			filesObjList.replace(
 					tConfigs[targetOS].sourcePaths[0],

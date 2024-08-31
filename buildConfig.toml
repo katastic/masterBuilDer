@@ -6,6 +6,7 @@
     
 [options]
     automaticallyAddOutputExtension = true   # main for linux, main.exe for windows
+    runProgramAfterward = true
 
 [windows]
     outputPath = ''

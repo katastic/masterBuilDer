@@ -32,8 +32,8 @@
     libPaths = [
         '.',
         '/home/novous/Desktop/git/spaceHoleAndPiracy/lib/', 
-        '/home/novous/Desktop/git/spaceHoleAndPiracy/toml',
-        '/home/novous/Desktop/git/spaceHoleAndPiracy/src'] 
+        '/home/novous/Desktop/git/spaceHoleAndPiracy/toml/',
+        '/home/novous/Desktop/git/spaceHoleAndPiracy/src/'] 
     recursiveLibPaths = []
     libs = [ "toml", "dallegro5dmd", "allegro", "allegro_primitives", "allegro_image", "allegro_ttf", "allegro_font"  ] # are we using this field??
     includePaths = [

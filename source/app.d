@@ -1,4 +1,6 @@
 /+
+	we can compile dub packages by going into dir and running dub 
+
 
 	-> we need "go" command or whatever. compile and run if successful.
 

@@ -1,4 +1,6 @@
 /+
+	TEST is cached build is actually working or rebuilding always.
+
 	we can compile dub packages by going into dir and running dub 
 
 

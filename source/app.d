@@ -1,5 +1,11 @@
 /+
 	TEST is cached build is actually working or rebuilding always.
+		+ was missing for multithread compile
+		- still test more.
+
+	- ALSO, we're still compiling executable even if ALL source files have NO updates!
+
+
 
 	we can compile dub packages by going into dir and running dub 
 
@@ -11,7 +17,6 @@
 
 		we probably want a projectRootPath, and then an output path if different!
 
-		DETECT if root or relative? Or set a config? for all other paths
 		DETECT if root or relative? Or set a config? for all other paths
 
 	- we can set the working directory of executeShell! Maybe set it to our root directory? The config directory?
@@ -955,6 +960,8 @@ void commandBuild() {
 							//if(stopOnFirstError)break; // can't do breaks in parallel foreach
 						} else {
 							writefln("Compilation of %s succeeded.", file);
+							fcl.saveResults();
+
 						}
 					} else {
 						writeln("Would have tried to execute (file to obj):\n\t", execString);

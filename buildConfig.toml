@@ -80,7 +80,7 @@
 
 [debug]
     name = "debug"
-    modesEnabled = ["debug", "optimize", "ignoreDepreciated", "dip1000"]
+    modesEnabled = ["debug", "debugSymbols", "optimize", "ignoreDepreciated", "dip1000"]
     extraCompilerFlags = "" # these won't be cross compiler. add your own [modeStrings] for those.
     extraLinkerFlags = ""
     outputFilename = "main" # auto add .exe for windows or change [automaticallyAddOutputExtension]

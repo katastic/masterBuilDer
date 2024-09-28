@@ -51,7 +51,7 @@
 
 [modeStrings]
     debug = ["-debug","-d-debug"]
-    debugSymbols = ["-g", "-g"]
+    debugSymbols = ["-g -gdwarf=5", "-g"]
     debugSymbolsNonDDebuggers = ["", "-gc"]
     optimize = ["-O", "-O"]
     profile = ["-profile",""]

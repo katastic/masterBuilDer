@@ -1,0 +1,11 @@
+
+[options]
+    colorizeOutput = true
+    useExternalHighlighter = false
+# config file for your specific installation.
+# Should be able to run without this so people can .gitignore it.
+[externalLocations] # external tool locations. If empty, not supported.
+    dscanner = 'dscanner'
+    pygmentize = 'pygmentize' # if we don't do our own
+
+#WARN: TOML file cannot end on comment, need a final newline.

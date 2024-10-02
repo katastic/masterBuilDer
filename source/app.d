@@ -544,6 +544,11 @@ void runLint() {
 int parseModeInit(string arg) {
 	verboseWritefln("parseModeInit(%s)", arg);
 	switch (arg.strip) {
+	case "run":
+		writeln("we set modeSet = run");
+		exeConfig.modeSet = "run";
+		exeConfig.didCompileSucceed = true; // encapsulation break? needed?
+		return 0;
 	case "build":
 		exeConfig.doRunCompiler = true;
 		exeConfig.modeSet = "build";
@@ -703,33 +708,52 @@ void parseCommandline(string[] myArgs) {
 		foreach (arg; myArgs) {
 			if (forwardRemainingArguments) {
 				setForwardArguments(arg);
-			} else {
-				if (modeSet == "default") {
-					if (parseModeInit(arg)) {
-						return;
-					}
+					writeln("forward");
+			} else { // <---------------- This looks INCREDIBLY WRONG.
+				writeln("else: [", arg,"], vs modeSet[", modeSet,"]");
+				if (modeSet == "default") { 
+					writeln("NOTICED NOTHING");
+					if (parseModeInit(arg))return;
+					writeln("modeset now:", modeSet);
 				} else if (modeSet == "build" || modeSet == "go") {
+					writeln("NOTICED BUILD/GO");
 					if (parseModeBuild(arg)) {
 						return;
 					}
-				} else if (modeSet == "helper") {
+				} else if (modeSet == "helper") {//<-------
+					writeln("NOTICED HELPER"); 
 					displayHelp();
-				} else if (modeSet == "quote") {
+				} else if (modeSet == "quote") { //<-------
+					writeln("NOTICED QUOTE");
 					displayQuote();
-				} else if (modeSet == "run") {
+				} else if (modeSet == "run") { //<-------
+					writeln("NOTICED RUN");
 					commandRun();
 				}
 			}
+			writeln("arg was ", arg);
 		}
+		
 		if (modeSet == "build" || modeSet == "go")
 			commandBuild();
-		if (modeSet == "go" && didCompileSucceed)
+		if (modeSet == "run" || (modeSet == "go" && didCompileSucceed))
 			commandRun(); // "go" = build and run
 	}
 	return;
 }
 
 void commandRun() {
+	writeln("commandRun()");
+	auto pConfigs2 = runToml();
+	string fileExtension;
+	if (exeConfig.selectedTargetOS == "windows")
+		fileExtension = ".exe"; 
+	else 
+		fileExtension = "";
+	auto profile = exeConfig.selectedProfile;
+	string filename = pConfigs2[profile].outputFilename ~ fileExtension;
+	string outputFileStr = tConfigs[exeConfig.selectedTargetOS].projectRootPath ~ filename;
+	runProgram(outputFileStr, exeConfig.selectedTargetOS);
 	// exeConfig.forwardArguments
 }
 
@@ -785,6 +809,7 @@ string colorizeParenthesis(string input, string color) { // WHAT IF there's MULT
 	}
 	return data;
 }
+
 
 void commandBuild() {
 	ProfileConfiguration[string] pConfigs = runToml();
@@ -928,6 +953,8 @@ void commandBuild() {
 					foreach (p; tConfigs[targetOS].includePaths)
 						includePathsStr ~= format("-I%s ", p);
 
+					writeln("exeConfig.selectedProfile:", exeConfig.selectedProfile);
+					writeln("pConfigs:", pConfigs);
 					string execString = format("dmd -c %s -od=%s %s %s %s -of=%s", // does -od even work??
 						includePathsStr,
 						tConfigs[targetOS].intermediatePath,
@@ -1020,16 +1047,23 @@ void commandBuild() {
 
 				if (exeConfig.runProgramAfterward)
 					{
-					auto s = spawnShell(
-							outputFileStr, 
-							config:Config.stderrPassThrough,
-							workDir:tConfigs[targetOS].projectRootPath);
-					
-					wait(s);
+					runProgram(outputFileStr, targetOS);
 					}
 				}
 			}
 		}
+}
+
+int runProgram(string outputFileStr, string targetOS){
+	writefln("runProgram(%s,%s):", outputFileStr, targetOS);
+	auto s = spawnShell(
+		outputFileStr, 
+		config:Config.stderrPassThrough,
+		workDir:tConfigs[targetOS].projectRootPath);
+
+	wait(s);
+
+	return 0;
 }
 
 //void runProgram(string command){

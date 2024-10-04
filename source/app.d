@@ -953,8 +953,8 @@ void commandBuild() {
 					foreach (p; tConfigs[targetOS].includePaths)
 						includePathsStr ~= format("-I%s ", p);
 
-					writeln("exeConfig.selectedProfile:", exeConfig.selectedProfile);
-					writeln("pConfigs:", pConfigs);
+					//writeln("exeConfig.selectedProfile:", exeConfig.selectedProfile);
+					//writeln("pConfigs:", pConfigs);
 					string execString = format("dmd -c %s -od=%s %s %s %s -of=%s", // does -od even work??
 						includePathsStr,
 						tConfigs[targetOS].intermediatePath,

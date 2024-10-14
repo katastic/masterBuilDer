@@ -477,7 +477,7 @@ class ExeConfigType {
 	bool runProgramAfterward = true;
 	string modeSet = "default"; // todo: change to enum or whatever. /// This is the builder mode state variable! NOT a "mode"/profile/etc. 'default' to start.
 
-	string selectedProfile = "release";
+	string selectedProfile = "debug"; /// default profile: debug symbols.
 	string selectedCompiler = "dmd";
 	string selectedTargetOS = "SETME"; // set by version statement in main.
 

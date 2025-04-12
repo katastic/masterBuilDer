@@ -1,4 +1,9 @@
 /+
+
+	- where do we store cached files? inside their project directory right?
+	--> iirc I still don't have specify mb.config working
+
+
 	TEST is cached build is actually working or rebuilding always.
 		+ was missing for multithread compile
 		- still test more.
@@ -326,6 +331,7 @@ ProfileConfiguration[string] runToml() {
 
 	globalConfig.automaticallyAddOutputExtension = doc["options"]["automaticallyAddOutputExtension"]
 		.boolean;
+	writeln(doc["options"]);
 	exeConfig.runProgramAfterward = doc["options"]["runProgramAfterward"].boolean;
 
 	string[] compilerNames = convTOMLtoArray(doc["project"]["compilers"]);
@@ -438,6 +444,7 @@ class ExeConfigType {
 			string newPath = filepath ~ "mbConfig.toml";
 			writeln("Using config file at [", newPath, "]");
 			string data = cast(string) read(newPath); //r"C:\git\masterBuilDer\mbConfig.toml");
+			writeln("file size: ", data.length);
 			doc = parseTOML(data);
 		} catch (Exception e) {
 			writefln("No mbConfig file found or readable [searched for %s]. Resorting to default exe configuration.", filepath);
@@ -824,7 +831,7 @@ void commandBuild() {
 	verboseWriteln("");
 	displayQuote();
 	verboseWriteln("");
-	verboseWriteln("Files to compile [", targetOS, "]");
+	verboseWriteln("Files to compile for OS [", targetOS, "]");
 	foreach (t; tConfigs)
 		verboseWriteln(t.sourceFilesFound);
 	foreach (file; tConfigs[targetOS].sourceFilesFound2) {

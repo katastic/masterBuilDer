@@ -7,11 +7,11 @@ module utility;
 import toml;
 import std.array;
 import std.stdio : write, writeln, writefln;
-import std.string : indexOfAny;
+import std.string : indexOf;
 import std.algorithm : map;
 
 alias fileHashes = string[string];
-__gshared bool *doVerboseMode;
+__gshared bool *doVerboseMode; //ptr is necessary apparently?
 
 /// Return a word-wrapped string at length
 string wordWrap(string text, uint length){ 
@@ -20,7 +20,7 @@ string wordWrap(string text, uint length){
 	string[] words = text.split(" ");
 	string output = "";
 	foreach(word; words){
-		if(lineBuffer.length + word.length < length){
+		if(lineBuffer.length + word.length <= length){
 			lineBuffer ~= word ~ " ";
 			}else{
 			output ~= lineBuffer ~ "\n";
@@ -35,11 +35,11 @@ void setVerboseModeVariable(bool *_doVerboseMode){
     doVerboseMode = _doVerboseMode;
     }
 
-bool isAny(string src, string match){ return (src.indexOfAny(match) != -1); } /// Is any string src in match? return: boolean
+bool isAny(string src, string match){ return (src.indexOf(match) != -1); } /// Is any string src in match? return: boolean
   
 /// Is there any string src in match after AfterThis matches? return: boolean. false if either condition fails
 bool isAnyAfter(string src, string match, string afterThis){    
-	return (src.indexOfAny(afterThis) != -1) && (src.indexOfAny(match) != -1);
+	return (src.indexOf(afterThis) != -1) && (src.indexOf(match) != -1);
 	}
 
 string[] convTOMLtoArray(TOMLValue t){ 
@@ -50,7 +50,7 @@ string[] convTOMLtoArray(TOMLValue t){
 void verboseWrite(A...)(A a){  // todo: what about fln version. Pass in a std.format is all needed?
     assert(doVerboseMode !is null, "doVerboseMode pointer is null!");
 	if(!*doVerboseMode)return;
-	foreach(t; a)write(t);	
+	foreach(t; a)write(t);
 	//if(exeConfig.doPrintVerbose)foreach(t; a)writeln(t);
 	}
 
@@ -64,8 +64,9 @@ void verboseWriteln(A...)(A a){  // todo: what about fln version. Pass in a std.
 
 /// adapted from from function signatures here: https://github.com/dlang/phobos/blob/master/std/stdio.d
 void verboseWritefln(alias fmt, A...)(A args){
+	import std.stdio : writefln;
     assert(doVerboseMode !is null, "doVerboseMode pointer is null!");
-    if (isSomeString!(typeof(fmt))){
+    if (isSomeString!(typeof(fmt))){ // <-- this is dead code? WE MUST NOT USE THIS???
 		if(!*doVerboseMode)return;
         return writefln(fmt, args);
         }
@@ -90,7 +91,7 @@ bool isHidden(DirEntry de){                             /// Because D is dumb an
 		return cast(bool)(de.attributes & FILE_ATTRIBUTE_HIDDEN); //https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
 		}
 	version(linux){
-		return de.isFirstLetterDot;
+		return de.isFirstLetterDot; // todo: chatgpt says this should be return isFirstLetterDot(de.name);
 		}
 	assert(0, "OS not implemented");
 	}

@@ -1,5 +1,39 @@
 /+
 
+4. Config-relative paths not handled
+
+		If your TOML contains something like:
+
+		src = "src"
+		build = "build"
+
+		You likely interpret these relative to:
+
+		current working directory, not
+		location of mbConfig.toml
+
+		👉 That’s a classic bug.
+
+		If config is in:
+
+		/projects/foo/mbConfig.toml
+
+		and you run from:
+
+		/projects
+
+		Then "src" resolves wrong.
+
+		👉 Fix:
+		All paths in config should be resolved relative to:
+
+		dirName(configPath)
+
+
+	- chatgpt: no write file caching so if program crashes while writing TOML file it'll wipe it. better to output to temp file, then remove old one and rename? are linux vs windows different here with i-node shennanigans / journal ntfs?
+	- no TOML validation
+
+
 	- where do we store cached files? inside their project directory right?
 	--> iirc I still don't have specify mb.config working
 
@@ -100,7 +134,7 @@ final class FileCacheList {
 			verboseWriteln("No cached data. Enumerating all files.");
 			return currentValues;
 		}
-		database = currentValues; // NOTE: SIDE-EFFECT. Calling this updates our perception of database.
+		database = currentValues; // NOTE: SIDE-EFFECT. Calling this updates our perception of database! ChatGPT agrees.
 		fileHashes differences;
 
 		foreach (k, v; oldValues) {
@@ -110,7 +144,7 @@ final class FileCacheList {
 			verboseWritefln("cached %s %s", k, v);
 		}
 
-		// what if a file is REMOVED??
+		// what if a file is REMOVED?? TODO FIX. ChatGPT agrees, removed files are never detected. needs second loop to iterate oldValues
 		verboseWriteln("compareAndFindDifferences() - DIFFERENCES");
 		foreach (k, v; currentValues) {
 			if (k !in oldValues) {
@@ -150,6 +184,7 @@ final class FileCacheList {
 			file.writefln("\"%s\" = \"%s\"", f, hex);
 			database[f] = hex;
 		}
+		file.close();
 	}
 
 	fileHashes scanCachedHashes() {
@@ -166,14 +201,35 @@ final class FileCacheList {
 		}
 		return results;
 	}
+/*
 
+Keys are file paths, but:
+
+	not normalized
+	not absolute
+	not canonicalized
+
+So these become different entries:
+
+	src/main.d
+	./src/main.d
+	../project/src/main.d
+*/
 	fileHashes scanHashes(string[] files) {
 		fileHashes results;
 		verboseWriteln("scanHashes() - FileCacheList:");
 		foreach (f; files) {
-			string hex = toHexString!(LetterCase.lower)(digest!CRC32(readText(f))).dup;
+	//		string hex = toHexString!(LetterCase.lower)(digest!CRC32(readText(f))).dup; //ChatGPT: This will crash if readText fails.
+			try{
+			string text = readText(f);
+			string hex = toHexString!(LetterCase.lower)(digest!CRC32(text)).dup; //ChatGPT: This will crash if readText fails.
 			verboseWritefln("\t%30s - %s", f, hex);
 			results[f] = hex;
+			}catch(Exception e){
+			writeln(e);
+			assert(false);
+			// TODO: how do we handle this gracefully?
+			}
 		}
 		return results;
 	}
@@ -199,9 +255,9 @@ struct FilePath {
 	string filename; /// myfile.exe
 	string extension; /// .exe
 	string basename; /// myfile
-	string reldir; ///	./bin/
+	//string reldir; ///	./bin/
 	string absdir; /// C:/git/taco/bin/
-	string relpathAndName; /// ./bin/myfile.exe
+	//string relpathAndName; /// ./bin/myfile.exe
 	string fullPathAndName; /// C:/git/taco/bin/myfile.exe
 
 	this(string _fullPathAndName) { // how do we handle if we gave it a directory? These are all FILES right?
@@ -220,24 +276,17 @@ struct FilePath {
 		// and it has to occur _after_ any slashes. [also slashes must be OS specific]
 		// need either nested slashes function or regex
 
-		string delimeter = "ERROR";
+		string delim = "ERROR";
 		version (Windows) {
-			delimeter = "\\";
+			delim = "\\";
 		}
 		version (linux) {
-			delimeter = "/";
-		}
-		assert(delimeter != "ERROR");
-
-		// what if we have NO SLASHES. just a raw name? (well then it's not absolute)
-		//		if(!fp.isAny("\\")){
-
-		string delim = "\\";
-		version (linux)
 			delim = "/";
+		}
+		assert(delim != "ERROR");
 
-		if (fp.isAnyAfter(".", delim)) {
-			auto idx = fp.lastIndexOf(".");
+		if (fp.isAnyAfter(".", delim)) { // kat 2026: What in the fresh holy hell is this.
+  			auto idx = fp.lastIndexOf("."); //chatgpt says: This will break on directories with a DOT in the name, says use idx > j.
 			if (idx != -1) {
 				extension = fp[idx + 1 .. $]; // filename.d -> 'd'
 
@@ -299,7 +348,15 @@ ProfileConfiguration[string] runToml() {
 	//exeConfig parsing
 	//------------------------------------------------------------------------------------
 	verboseWriteln(readText(exeConfig.buildScriptFileName));
-	doc = parseTOML(cast(string) read(exeConfig.buildScriptFileName));
+	void[] text;
+	
+	try{
+	text = read(exeConfig.buildScriptFileName);
+	}catch(Exception e){
+	writeln("Couldn't load mbConfig.toml");
+	assert(false);
+	}
+	doc = parseTOML(cast(string) text);
 
 	auto compilers = doc["project"]["compilers"].array;
 	foreach (c; compilers)
@@ -945,6 +1002,10 @@ void commandBuild() {
 		} else {
 			writeln(" - multi threaded mode");
 			// TODO ?
+			
+			// NEED to add stop if any of them fail? shared fail flag or taskpool cancellation
+			//
+			
 			// Also, if we need a dependency graph of build order, we could figure one
 			// out either automatically (just keep compiling random ones until the order works), or allow manual.
 

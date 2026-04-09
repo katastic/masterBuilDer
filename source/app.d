@@ -1,4 +1,27 @@
 /+
+7. No directory context switching
+
+	Even if you find a config in another directory, you don’t:
+
+	chdir into it
+	or store a project root
+
+	So:
+
+	relative paths break
+	output paths may go to wrong place
+
+
+10. Config reload inconsistency
+
+	If config changes:
+
+	you don’t invalidate cache
+	you don’t detect config changes
+
+	So:
+
+	compiler flags change → no rebuild
 
 4. Config-relative paths not handled
 
